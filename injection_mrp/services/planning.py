@@ -1303,7 +1303,7 @@ def _dedupe_demands(demands: list[DemandRow]) -> list[DemandRow]:
 
 def _insert_demand_snapshots(run, demands: list[DemandRow]) -> list[Any]:
 	snapshots = []
-	for demand in demands:
+	for demand in _filter_valid_demands(run, demands):
 		item = _get_item_values(demand.item_code)
 		bom = _get_default_bom(demand.item_code)
 		doc = frappe.get_doc(
@@ -1332,6 +1332,34 @@ def _insert_demand_snapshots(run, demands: list[DemandRow]) -> list[Any]:
 		doc.insert(ignore_permissions=True)
 		snapshots.append(doc)
 	return snapshots
+
+
+def _filter_valid_demands(run, demands: list[DemandRow]) -> list[DemandRow]:
+	valid_demands = []
+	for demand in demands:
+		if _item_exists(demand.item_code):
+			valid_demands.append(demand)
+			continue
+		_insert_invalid_demand_item_exception(run, demand)
+	return valid_demands
+
+
+def _insert_invalid_demand_item_exception(run, demand: DemandRow):
+	source = demand.source_name or demand.source_row or run.name
+	source_doctype = demand.source_doctype or "MRP Run"
+	_insert_exception(
+		run.name,
+		run.company,
+		"Error",
+		"Invalid Demand Item",
+		None,
+		source_doctype,
+		source,
+		_(
+			"Demand source contains item value '{0}', but it does not match any ERPNext Item. "
+			"Please correct the source document item code and rerun MRP. Source row: {1}."
+		).format(demand.item_code or "", demand.source_row or ""),
+	)
 
 
 def _explode_demand_snapshots(run, snapshots: list[Any]) -> list[RequirementCandidate]:
@@ -3415,6 +3443,11 @@ def _get_item_values_cached(item_code):
 
 
 @lru_cache(maxsize=10000)
+def _item_exists(item_code) -> bool:
+	return bool(item_code and frappe.db.exists("Item", item_code))
+
+
+@lru_cache(maxsize=10000)
 def _get_item_default_supplier(item_code):
 	if not _doctype_exists("Item Default") or not item_code:
 		return None
@@ -3725,6 +3758,9 @@ def _insert_exception(
 	message,
 	requirement_line=None,
 ):
+	if item_code and not _item_exists(item_code):
+		message = _("Item value '{0}' is invalid. {1}").format(item_code, message)
+		item_code = None
 	doc = frappe.get_doc(
 		{
 			"doctype": "MRP Exception Log",
@@ -3818,6 +3854,7 @@ def _clear_planning_caches():
 		_has_field,
 		_first_field,
 		_get_item_values_cached,
+		_item_exists,
 		_get_item_default_supplier,
 		_get_item_supplier,
 		_get_default_bom,

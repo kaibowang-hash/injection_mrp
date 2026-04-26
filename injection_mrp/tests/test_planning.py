@@ -265,3 +265,36 @@ class TestPlanningHelpers(unittest.TestCase):
 
 		self.assertEqual(planning._get_excess_supply_category(run, supply), "Excess Prebuy")
 		self.assertEqual(planning._get_excess_supply_action(run, supply), "Review Excess Prebuy")
+
+	def test_invalid_demand_item_is_filtered_to_exception(self):
+		original_item_exists = planning._item_exists
+		original_insert_invalid = planning._insert_invalid_demand_item_exception
+		captured = []
+		planning._item_exists = lambda item_code: item_code == "VALID-ITEM"
+		planning._insert_invalid_demand_item_exception = lambda run, demand: captured.append(demand.item_code)
+		try:
+			run = frappe._dict({"name": "MRP-RUN-TEST", "company": "Test Company"})
+			demands = [
+				planning.DemandRow(
+					demand_type="Sales Order",
+					item_code="VALID-ITEM",
+					qty=1,
+					required_date="2026-05-01",
+					company="Test Company",
+				),
+				planning.DemandRow(
+					demand_type="Sales Order",
+					item_code="PICO AD AIRPATH BODY RING",
+					qty=1,
+					required_date="2026-05-01",
+					company="Test Company",
+				),
+			]
+
+			valid = planning._filter_valid_demands(run, demands)
+		finally:
+			planning._item_exists = original_item_exists
+			planning._insert_invalid_demand_item_exception = original_insert_invalid
+
+		self.assertEqual([row.item_code for row in valid], ["VALID-ITEM"])
+		self.assertEqual(captured, ["PICO AD AIRPATH BODY RING"])
