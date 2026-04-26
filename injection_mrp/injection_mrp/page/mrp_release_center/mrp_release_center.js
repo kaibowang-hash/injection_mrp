@@ -22,6 +22,8 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 		{ label: __("Items"), fieldname: "item_count", numeric: true },
 		{ label: __("Total Qty"), fieldname: "total_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("MR Count"), fieldname: "material_request_count", numeric: true },
+		{ label: __("Superseded By"), fieldname: "superseded_by_batch", formatter: (value) => (value ? ui.doc_link("MRP Proposal Batch", value) : "") },
+		{ label: __("Validation"), fieldname: "validation_message" },
 		{ label: __("Generated On"), fieldname: "generated_on", formatter: (value) => (value ? frappe.datetime.str_to_user(value) : "") },
 		{ label: __("Applied On"), fieldname: "applied_on", formatter: (value) => (value ? frappe.datetime.str_to_user(value) : "") },
 	];
@@ -82,6 +84,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 				<td>${input_html("schedule_date", item.schedule_date, "date", !editable)}</td>
 				<td>${select_html("material_request_type", mrTypes, item.material_request_type, !editable)}</td>
 				<td>${select_html("supply_mode", supplyModes, item.supply_mode, !editable)}</td>
+				<td>${ui.code_badge(item.commitment_type, { tone: item.commitment_type === "Prebuy" ? "orange" : "green" })}</td>
 				<td>${input_html("warehouse", item.warehouse, "text", !editable)}</td>
 				<td>${input_html("from_warehouse", item.from_warehouse, "text", !editable)}</td>
 				<td>${input_html("customer", item.customer, "text", !editable)}</td>
@@ -109,6 +112,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 					<div class="ia-table-actions">
 						${ui.icon_button("download", __("Export Excel"), { "data-imrp-export-items": "1" })}
 						<button type="button" class="btn btn-default btn-xs" data-imrp-open-batch="1">${__("Open Proposal Batch")}</button>
+						${batch.status === "Ready" && ui.can_run_action("validate_proposal_batch_for_release") ? `<button type="button" class="btn btn-default btn-xs" data-imrp-validate-batch="1">${__("Validate")}</button>` : ""}
 						${editable ? `<button type="button" class="btn btn-default btn-xs" data-imrp-add-row="1">${__("Add Row")}</button>` : ""}
 						${editable ? `<button type="button" class="btn btn-primary btn-xs" data-imrp-save-batch="1">${__("Save Changes")}</button>` : ""}
 						${batch.status === "Ready" && ui.can_run_action("apply_proposal_batch") ? `<button type="button" class="btn btn-primary btn-xs" data-imrp-apply-batch="1">${__("Apply Proposal")}</button>` : ""}
@@ -123,6 +127,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 								<th>${__("Schedule Date")}</th>
 								<th>${__("MR Type")}</th>
 								<th>${__("Supply Mode")}</th>
+								<th>${__("Commitment")}</th>
 								<th>${__("Warehouse")}</th>
 								<th>${__("Source Warehouse")}</th>
 								<th>${__("Customer")}</th>
@@ -168,6 +173,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 					{ label: __("Schedule Date"), fieldname: "schedule_date" },
 					{ label: __("Material Request Type"), fieldname: "material_request_type" },
 					{ label: __("Supply Mode"), fieldname: "supply_mode" },
+					{ label: __("Commitment Type"), fieldname: "commitment_type" },
 					{ label: __("Warehouse"), fieldname: "warehouse" },
 					{ label: __("Source Warehouse"), fieldname: "from_warehouse" },
 					{ label: __("Customer"), fieldname: "customer" },
@@ -231,6 +237,18 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 			await refresh_detail();
 			await load();
 		});
+		drawer.find("[data-imrp-validate-batch='1']").on("click", async () => {
+			const result = await ui.with_busy(__("Validating proposal..."), () =>
+				ui.xcall("injection_mrp.api.app.validate_proposal_batch_for_release", { batch_name: batch.name })
+			);
+			frappe.msgprint({
+				title: result.valid ? __("Release Validation Passed") : __("Release Validation Blocked"),
+				indicator: result.valid ? "green" : "red",
+				message: ui.escape(result.validation_message || ""),
+			});
+			await refresh_detail();
+			await load();
+		});
 		drawer.find("[data-imrp-apply-batch='1']").on("click", async () => {
 			await ui.with_busy(__("Applying proposal..."), () => ui.xcall("injection_mrp.api.app.apply_proposal_batch", { batch_name: batch.name }));
 			drawer.remove();
@@ -256,6 +274,8 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 					{ label: __("Status"), value: batch.status },
 					{ label: __("Items"), value: items.length },
 					{ label: __("Total Qty"), value: ui.format_number(batch.total_qty) },
+					{ label: __("Superseded By"), html: batch.superseded_by_batch ? ui.doc_link("MRP Proposal Batch", batch.superseded_by_batch) : "" },
+					{ label: __("Validation"), value: batch.validation_message || "" },
 				],
 			},
 			{
@@ -264,6 +284,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 					{ label: __("Apply"), value: batch.status === "Ready" ? __("Use Apply Proposal to generate MR / consume prebuy.") : __("No release action required.") },
 					{ label: __("Generated By"), value: batch.generated_by },
 					{ label: __("Applied By"), value: batch.applied_by },
+					{ label: __("Superseded Reason"), value: batch.superseded_reason || "" },
 				],
 			},
 			{
@@ -312,7 +333,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 	}
 
 	ui.add_text_filter(shell.filters, __("Company"), "company", filters, load, "Link", "Company");
-	ui.add_text_filter(shell.filters, __("Status"), "status", filters, load, "Select", "\nDraft\nReady\nApplied\nRejected\nClosed");
+	ui.add_text_filter(shell.filters, __("Status"), "status", filters, load, "Select", "\nDraft\nReady\nApplied\nSuperseded\nExpired\nRejected\nClosed");
 	ui.render_actions(shell.actions, [
 		{ label: __("Apply Proposal"), action_key: "apply_proposal_batch", tone: "primary", on_click: apply_dialog },
 	]);

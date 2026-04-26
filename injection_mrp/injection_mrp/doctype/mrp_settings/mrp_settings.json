@@ -9,6 +9,8 @@
   "horizon_section",
   "firm_horizon_days",
   "prebuy_horizon_days",
+  "firm_fence_days",
+  "forecast_skip_firm_fence",
   "forecast_consumption_window_days",
   "material_staging_days",
   "warning_section",
@@ -50,6 +52,18 @@
    "fieldname": "prebuy_horizon_days",
    "fieldtype": "Int",
    "label": "Prebuy Horizon Days"
+  },
+  {
+   "default": "45",
+   "fieldname": "firm_fence_days",
+   "fieldtype": "Int",
+   "label": "Firm Fence Days"
+  },
+  {
+   "default": "0",
+   "fieldname": "forecast_skip_firm_fence",
+   "fieldtype": "Check",
+   "label": "Forecast Skip Firm Fence"
   },
   {
    "default": "30",

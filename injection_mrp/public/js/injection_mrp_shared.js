@@ -14,6 +14,7 @@ frappe.provide("injection_mrp.ui");
 		enqueue_firm_aps_mrp: ["System Manager", "MPLM", "MPLP"],
 		enqueue_recalculate_mrp_run: ["System Manager", "MPLM", "MPLP"],
 		apply_proposal_batch: ["System Manager", "MPLM", "MPLP"],
+		validate_proposal_batch_for_release: ["System Manager", "MPLM", "MPLP"],
 		save_proposal_batch_items: ["System Manager", "MPLM", "MPLP"],
 	};
 
@@ -188,6 +189,8 @@ frappe.provide("injection_mrp.ui");
 		Running: "RUN",
 		Applied: "APL",
 		Released: "REL",
+		Superseded: "SUP",
+		Expired: "EXP",
 		Consumed: "CON",
 		Closed: "CLD",
 		Calculated: "CAL",
@@ -486,7 +489,7 @@ frappe.provide("injection_mrp.ui");
 		if (["Exception", "Warning"].includes(status)) {
 			return "orange";
 		}
-		if (["Error", "Failed", "Cancelled", "Rejected"].includes(status)) {
+		if (["Error", "Failed", "Cancelled", "Rejected", "Superseded", "Expired"].includes(status)) {
 			return "red";
 		}
 		return "blue";

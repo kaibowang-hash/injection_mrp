@@ -31,6 +31,9 @@ MR_TYPE_BY_SUPPLY_MODE = {
 MRP_JOB_QUEUE = "long"
 MRP_JOB_TIMEOUT = 3600
 MRP_ACTIVE_STATUSES = {"Queued", "Running"}
+PROPOSAL_ACTIVE_STATUSES = {"Draft", "Ready"}
+PROPOSAL_RELEASEABLE_STATUS = "Ready"
+PROPOSAL_VALIDATION_TOLERANCE = 0.000001
 
 
 @dataclass
@@ -112,6 +115,8 @@ def get_settings_dict() -> frappe._dict:
 			"company": settings.company or frappe.defaults.get_user_default("Company"),
 			"firm_horizon_days": cint(settings.firm_horizon_days) or 45,
 			"prebuy_horizon_days": cint(settings.prebuy_horizon_days) or 120,
+			"firm_fence_days": cint(settings.get("firm_fence_days")) or cint(settings.firm_horizon_days) or 45,
+			"forecast_skip_firm_fence": cint(settings.get("forecast_skip_firm_fence")),
 			"forecast_consumption_window_days": cint(settings.forecast_consumption_window_days) or 30,
 			"material_staging_days": cint(settings.material_staging_days) or 7,
 			"early_supply_warning_days": cint(settings.early_supply_warning_days) or 7,
@@ -209,6 +214,7 @@ def run_mrp(
 		candidates = _explode_demand_snapshots(run, snapshots)
 		requirements = _net_requirements(run, settings, candidates)
 		batch = _create_proposal_batch(run, settings, requirements)
+		_supersede_overlapping_proposal_batches(batch, run)
 		rolling_summary = _calculate_rolling_availability(run, settings, requirements, batch)
 		_create_excess_prebuy_exceptions(run, requirements)
 
@@ -308,11 +314,26 @@ def enqueue_mrp_run(
 	return {"mrp_run": mrp_run, "job_id": job_id, "status": frappe.db.get_value("MRP Run", mrp_run, "status")}
 
 
+def validate_proposal_batch_for_release(batch_name: str) -> dict[str, Any]:
+	settings = get_settings_dict()
+	batch = frappe.get_doc("MRP Proposal Batch", batch_name)
+	result = _validate_proposal_batch_for_release(batch, settings)
+	_save_batch_validation_result(batch.name, result, commit=True)
+	return result
+
+
 def apply_proposal_batch(batch_name: str) -> dict[str, Any]:
 	settings = get_settings_dict()
 	batch = _lock_proposal_batch(batch_name)
 	if batch.status == "Applied":
 		return {"material_requests": [], "consumed_prebuy_qty": 0, "message": _("Proposal already applied.")}
+	if batch.status != PROPOSAL_RELEASEABLE_STATUS:
+		frappe.throw(_("Only Ready proposal batches can be applied. Current status: {0}.").format(batch.status))
+
+	validation = _validate_proposal_batch_for_release(batch, settings)
+	_save_batch_validation_result(batch.name, validation, commit=not validation["valid"])
+	if not validation["valid"]:
+		frappe.throw(_("Proposal batch validation failed: {0}").format(validation["validation_message"]))
 
 	if batch.proposal_type == "Forecast Prebuy" and not settings.allow_prebuy_material_request:
 		frappe.throw(_("Prebuy Material Request generation is disabled in MRP Settings."))
@@ -416,8 +437,12 @@ def get_run_console_data(limit: int = 20) -> dict[str, Any]:
 		"run_type",
 		"status",
 		"planning_date",
+		"horizon_start",
 		"horizon_end",
 		"aps_run",
+		"item_code",
+		"customer",
+		"warehouse",
 		"demand_count",
 		"requirement_count",
 		"exception_count",
@@ -433,6 +458,8 @@ def get_run_console_data(limit: int = 20) -> dict[str, Any]:
 		order_by="modified desc",
 		limit_page_length=cint(limit) or 20,
 	)
+	for run in runs:
+		run["previous_run"] = _find_previous_comparable_run(run)
 	return {
 		"cards": _summary_cards(),
 		"runs": runs,
@@ -440,6 +467,58 @@ def get_run_console_data(limit: int = 20) -> dict[str, Any]:
 			{"label": _("Run Forecast Prebuy"), "action_key": "enqueue_forecast_prebuy", "tone": "primary"},
 			{"label": _("Run Firm APS"), "action_key": "enqueue_firm_aps_mrp", "tone": "primary"},
 		],
+	}
+
+
+def get_run_comparison_data(mrp_run: str, previous_run: str | None = None) -> dict[str, Any]:
+	current = frappe.get_doc("MRP Run", mrp_run)
+	previous_run = previous_run or _find_previous_comparable_run(current)
+	previous = frappe.get_doc("MRP Run", previous_run) if previous_run else None
+	current_rows = _summarize_run_requirements(current.name)
+	previous_rows = _summarize_run_requirements(previous.name) if previous else {}
+	keys = sorted(set(current_rows) | set(previous_rows))
+	rows = []
+	summary = defaultdict(int)
+	for key in keys:
+		current_row = current_rows.get(key, {})
+		previous_row = previous_rows.get(key, {})
+		current_net = flt(current_row.get("net_qty"))
+		previous_net = flt(previous_row.get("net_qty"))
+		delta = current_net - previous_net
+		if key not in previous_rows:
+			change_type = "New"
+		elif key not in current_rows:
+			change_type = "Removed"
+		elif abs(delta) <= PROPOSAL_VALIDATION_TOLERANCE:
+			change_type = "Unchanged"
+		elif delta > 0:
+			change_type = "Increased"
+		else:
+			change_type = "Decreased"
+		summary[change_type] += 1
+		rows.append(
+			{
+				"change_type": change_type,
+				"item_code": current_row.get("item_code") or previous_row.get("item_code"),
+				"warehouse": current_row.get("warehouse") or previous_row.get("warehouse"),
+				"required_date": current_row.get("required_date") or previous_row.get("required_date"),
+				"commitment_type": current_row.get("commitment_type") or previous_row.get("commitment_type"),
+				"previous_gross_qty": flt(previous_row.get("gross_qty")),
+				"current_gross_qty": flt(current_row.get("gross_qty")),
+				"previous_net_qty": previous_net,
+				"current_net_qty": current_net,
+				"delta_net_qty": delta,
+				"previous_new_supply_qty": flt(previous_row.get("new_supply_qty")),
+				"current_new_supply_qty": flt(current_row.get("new_supply_qty")),
+				"previous_prebuy_consumed_qty": flt(previous_row.get("prebuy_consumed_qty")),
+				"current_prebuy_consumed_qty": flt(current_row.get("prebuy_consumed_qty")),
+			}
+		)
+	return {
+		"current_run": current.as_dict(),
+		"previous_run": previous.as_dict() if previous else None,
+		"rows": rows,
+		"summary": dict(summary),
 	}
 
 
@@ -517,6 +596,7 @@ def get_material_workbench_data(
 			"open_mr_qty",
 			"open_po_qty",
 			"open_wo_qty",
+			"prebuy_available_qty",
 			"prebuy_consumed_qty",
 			"pegged_supply_qty",
 			"new_supply_qty",
@@ -723,23 +803,34 @@ def get_release_center_data(
 		query_filters["company"] = filters["company"]
 	if filters.get("status"):
 		query_filters["status"] = filters["status"]
+	fields = [
+		"name",
+		"mrp_run",
+		"company",
+		"proposal_type",
+		"status",
+		"item_count",
+		"total_qty",
+		"material_request_count",
+		"generated_by",
+		"generated_on",
+		"applied_by",
+		"applied_on",
+	]
+	for fieldname in (
+		"superseded_by_run",
+		"superseded_by_batch",
+		"superseded_on",
+		"superseded_reason",
+		"last_validation_on",
+		"validation_message",
+	):
+		if _has_field("MRP Proposal Batch", fieldname):
+			fields.append(fieldname)
 	batches = frappe.get_all(
 		"MRP Proposal Batch",
 		filters=query_filters,
-		fields=[
-			"name",
-			"mrp_run",
-			"company",
-			"proposal_type",
-			"status",
-			"item_count",
-			"total_qty",
-			"material_request_count",
-			"generated_by",
-			"generated_on",
-			"applied_by",
-			"applied_on",
-		],
+		fields=fields,
 		order_by="modified desc",
 		limit_start=limit_start,
 		limit_page_length=limit_page_length,
@@ -847,6 +938,365 @@ def _lock_proposal_batch(batch_name: str):
 	return frappe.get_doc("MRP Proposal Batch", batch_name)
 
 
+def _validate_proposal_batch_for_release(batch, settings) -> dict[str, Any]:
+	blocking: list[dict[str, Any]] = []
+	warnings: list[dict[str, Any]] = []
+	rows: list[dict[str, Any]] = []
+	if batch.status != PROPOSAL_RELEASEABLE_STATUS:
+		_add_validation_issue(
+			blocking,
+			rows,
+			"Batch Status",
+			_("Only Ready proposal batches can be applied. Current status: {0}.").format(batch.status),
+			batch=batch,
+		)
+
+	active_rows = [
+		row
+		for row in _proposal_batch_items(batch)
+		if row.status == "Pending" and row.action != "No Action" and flt(row.qty) > PROPOSAL_VALIDATION_TOLERANCE
+	]
+	if not active_rows:
+		_add_validation_issue(blocking, rows, "No Pending Items", _("No pending proposal items are available to apply."), batch=batch)
+
+	for row in active_rows:
+		_validate_proposal_commitment(batch, row, blocking, rows)
+		newer_batch = _find_newer_overlapping_ready_batch(batch, row)
+		if newer_batch:
+			_add_validation_issue(
+				blocking,
+				rows,
+				"Newer Proposal",
+				_("A newer ready proposal batch {0} contains the same item, warehouse, date and commitment.").format(newer_batch),
+				batch=batch,
+				row=row,
+			)
+
+	_validate_create_mr_shortages(batch, settings, active_rows, blocking, warnings, rows)
+	_validate_prebuy_consumption(batch, active_rows, blocking, rows)
+
+	message = _validation_message(blocking, warnings)
+	return {
+		"valid": not blocking,
+		"blocking_issues": blocking,
+		"warnings": warnings,
+		"rows": rows,
+		"validation_message": message,
+	}
+
+
+def _validate_proposal_commitment(batch, row, blocking, rows):
+	if row.action == "Create Material Request":
+		if batch.proposal_type == "Forecast Prebuy" and row.commitment_type != "Prebuy":
+			_add_validation_issue(
+				blocking,
+				rows,
+				"Commitment Mismatch",
+				_("Forecast Prebuy proposals can only release Prebuy commitments."),
+				batch=batch,
+				row=row,
+			)
+		if batch.proposal_type == "Firm APS" and row.commitment_type != "Firm":
+			_add_validation_issue(
+				blocking,
+				rows,
+				"Commitment Mismatch",
+				_("Firm APS material request proposals must release Firm commitments."),
+				batch=batch,
+				row=row,
+			)
+	if row.action == "Consume Prebuy" and row.commitment_type != "Prebuy":
+		_add_validation_issue(
+			blocking,
+			rows,
+			"Commitment Mismatch",
+			_("Consume Prebuy rows must keep Prebuy commitment type."),
+			batch=batch,
+			row=row,
+		)
+
+
+def _proposal_batch_items(batch) -> list[Any]:
+	items = getattr(batch, "items", None)
+	if callable(items):
+		return batch.get("items") or []
+	return items or []
+
+
+def _validate_create_mr_shortages(batch, settings, active_rows, blocking, warnings, rows):
+	create_rows = [row for row in active_rows if row.action == "Create Material Request" and row.requirement_line]
+	if not create_rows:
+		return
+	requirements = _get_requirement_validation_map([row.requirement_line for row in create_rows])
+	run = _get_validation_run(batch.mrp_run)
+	grouped: dict[tuple[str, str | None], list[Any]] = defaultdict(list)
+	for row in create_rows:
+		requirement = requirements.get(row.requirement_line)
+		if not requirement:
+			_add_validation_issue(
+				warnings,
+				rows,
+				"Missing Requirement",
+				_("Requirement line was not found; live shortage cannot be revalidated."),
+				batch=batch,
+				row=row,
+				severity="Warning",
+			)
+			continue
+		grouped[(row.item_code, row.warehouse)].append(row)
+
+	for (item_code, warehouse), group_rows in grouped.items():
+		supply_records = _get_supply_records(item_code, batch.company, warehouse, settings, run)
+		current_shortage_by_requirement = _get_current_shortage_by_requirement(
+			batch.mrp_run,
+			item_code,
+			warehouse,
+			supply_records,
+			[row.requirement_line for row in group_rows],
+			requirements,
+		)
+		for row in group_rows:
+			current_shortage = current_shortage_by_requirement.get(row.requirement_line, flt(row.qty))
+			if current_shortage + PROPOSAL_VALIDATION_TOLERANCE < flt(row.qty):
+				_add_validation_issue(
+					blocking,
+					rows,
+					"Reduced Shortage",
+					_("Current shortage {0} is lower than proposal qty {1}; please recheck this row.").format(
+						round(current_shortage, 6), round(flt(row.qty), 6)
+					),
+					batch=batch,
+					row=row,
+					current_shortage_qty=current_shortage,
+				)
+			elif current_shortage > flt(row.qty) + PROPOSAL_VALIDATION_TOLERANCE:
+				_add_validation_issue(
+					warnings,
+					rows,
+					"Increased Shortage",
+					_("Current shortage {0} is higher than proposal qty {1}; this batch may not cover the full demand.").format(
+						round(current_shortage, 6), round(flt(row.qty), 6)
+					),
+					batch=batch,
+					row=row,
+					severity="Warning",
+					current_shortage_qty=current_shortage,
+				)
+
+
+def _get_current_shortage_by_requirement(
+	mrp_run: str | None,
+	item_code: str,
+	warehouse: str | None,
+	supply_records: list[SupplyRecord],
+	proposal_requirement_names: list[str],
+	fallback_requirements: dict[str, Any],
+) -> dict[str, float]:
+	requirement_rows = _get_run_requirement_validation_rows(mrp_run, item_code, warehouse)
+	if not requirement_rows:
+		requirement_rows = [fallback_requirements[name] for name in proposal_requirement_names if name in fallback_requirements]
+	requirement_rows.sort(
+		key=lambda row: (
+			getdate(row.get("material_need_date") or row.get("required_date") or today()),
+			row.get("name") or "",
+		)
+	)
+	shortage_by_requirement = {}
+	for requirement in requirement_rows:
+		gross_qty = flt(requirement.get("gross_qty"))
+		covered_qty = _consume_validation_supply(supply_records, gross_qty)
+		shortage_by_requirement[requirement.name] = max(gross_qty - covered_qty, 0)
+	return shortage_by_requirement
+
+
+def _get_run_requirement_validation_rows(mrp_run: str | None, item_code: str, warehouse: str | None) -> list[Any]:
+	if not mrp_run:
+		return []
+	rows = frappe.get_all(
+		"MRP Requirement Line",
+		filters={"mrp_run": mrp_run, "item_code": item_code},
+		fields=[
+			"name",
+			"item_code",
+			"warehouse",
+			"required_date",
+			"material_need_date",
+			"gross_qty",
+			"net_qty",
+		],
+		order_by="material_need_date asc, required_date asc, name asc",
+		limit_page_length=100000,
+	)
+	return [row for row in rows if (row.warehouse or "") == (warehouse or "")]
+
+
+def _validate_prebuy_consumption(batch, active_rows, blocking, rows):
+	consume_rows = [row for row in active_rows if row.action == "Consume Prebuy"]
+	if not consume_rows:
+		return
+	grouped: dict[tuple[str, str | None], list[Any]] = defaultdict(list)
+	for row in consume_rows:
+		grouped[(row.item_code, row.warehouse)].append(row)
+
+	for (item_code, warehouse), group_rows in grouped.items():
+		prebuy_records = _get_prebuy_supply_records(item_code, batch.company, warehouse)
+		group_rows.sort(key=lambda row: (getdate(row.schedule_date or row.required_date or today()), row.name))
+		for row in group_rows:
+			available_qty = _consume_validation_supply(prebuy_records, flt(row.qty))
+			if available_qty + PROPOSAL_VALIDATION_TOLERANCE < flt(row.qty):
+				_add_validation_issue(
+					blocking,
+					rows,
+					"Insufficient Prebuy",
+					_("Available prebuy qty {0} is lower than consume qty {1}.").format(
+						round(available_qty, 6), round(flt(row.qty), 6)
+					),
+					batch=batch,
+					row=row,
+					current_shortage_qty=max(flt(row.qty) - available_qty, 0),
+				)
+
+
+def _get_requirement_validation_map(requirement_names: list[str]) -> dict[str, Any]:
+	names = [name for name in dict.fromkeys(requirement_names) if name]
+	if not names:
+		return {}
+	rows = frappe.get_all(
+		"MRP Requirement Line",
+		filters={"name": ["in", names]},
+		fields=[
+			"name",
+			"item_code",
+			"warehouse",
+			"required_date",
+			"material_need_date",
+			"gross_qty",
+			"net_qty",
+		],
+		limit_page_length=len(names),
+	)
+	return {row.name: row for row in rows}
+
+
+def _get_validation_run(mrp_run: str | None):
+	if not mrp_run:
+		return None
+	try:
+		return frappe.get_doc("MRP Run", mrp_run)
+	except Exception:
+		return None
+
+
+def _consume_validation_supply(supply_records: list[SupplyRecord], qty: float) -> float:
+	remaining = flt(qty)
+	consumed = 0.0
+	for supply in _ordered_supply_records(supply_records):
+		if remaining <= PROPOSAL_VALIDATION_TOLERANCE:
+			break
+		available = flt(supply.remaining_qty)
+		if available <= PROPOSAL_VALIDATION_TOLERANCE:
+			continue
+		consume = min(available, remaining)
+		supply.remaining_qty = max(available - consume, 0)
+		remaining -= consume
+		consumed += consume
+	return consumed
+
+
+def _find_newer_overlapping_ready_batch(batch, row) -> str | None:
+	date_value = row.schedule_date or row.required_date
+	if not row.item_code or not date_value:
+		return None
+	rows = frappe.db.sql(
+		"""
+		select batch.name
+		from `tabMRP Proposal Item` item
+		inner join `tabMRP Proposal Batch` batch on batch.name = item.parent
+		where batch.name != %(batch_name)s
+			and batch.company = %(company)s
+			and batch.status = 'Ready'
+			and item.status = 'Pending'
+			and item.action in ('Create Material Request', 'Consume Prebuy')
+			and item.item_code = %(item_code)s
+			and ifnull(item.warehouse, '') = %(warehouse)s
+			and ifnull(coalesce(item.schedule_date, item.required_date), '') = %(date_value)s
+			and ifnull(item.qty, 0) > 0
+			and (
+				ifnull(batch.generated_on, batch.creation) > %(generated_on)s
+				or (
+					ifnull(batch.generated_on, batch.creation) = %(generated_on)s
+					and batch.name > %(batch_name)s
+				)
+			)
+		order by ifnull(batch.generated_on, batch.creation) desc, batch.name desc
+		limit 1
+		""",
+		{
+			"batch_name": batch.name,
+			"company": batch.company,
+			"proposal_type": batch.proposal_type,
+			"item_code": row.item_code,
+			"warehouse": row.warehouse or "",
+			"commitment_type": row.commitment_type or "",
+			"date_value": date_value,
+			"generated_on": batch.generated_on or batch.creation,
+		},
+		as_dict=True,
+	)
+	return rows[0].name if rows else None
+
+
+def _add_validation_issue(
+	target: list[dict[str, Any]],
+	rows: list[dict[str, Any]],
+	issue_type: str,
+	message: str,
+	batch=None,
+	row=None,
+	severity: str = "Blocker",
+	current_shortage_qty: float | None = None,
+):
+	issue = {
+		"severity": severity,
+		"issue_type": issue_type,
+		"message": message,
+		"batch": batch.name if batch else None,
+		"row": row.name if row else None,
+		"item_code": row.item_code if row else None,
+		"warehouse": row.warehouse if row else None,
+		"schedule_date": row.schedule_date if row else None,
+		"required_date": row.required_date if row else None,
+		"action": row.action if row else None,
+		"commitment_type": row.commitment_type if row else None,
+		"proposal_qty": flt(row.qty) if row else 0,
+		"current_shortage_qty": current_shortage_qty,
+	}
+	target.append(issue)
+	rows.append(issue)
+
+
+def _validation_message(blocking, warnings) -> str:
+	if blocking:
+		first = blocking[0].get("message") or _("Release validation failed.")
+		return _("Blocked: {0} issue(s). {1}").format(len(blocking), first)
+	if warnings:
+		first = warnings[0].get("message") or _("Release validation has warnings.")
+		return _("Valid with {0} warning(s). {1}").format(len(warnings), first)
+	return _("Ready for release.")
+
+
+def _save_batch_validation_result(batch_name: str, result: dict[str, Any], commit: bool = False):
+	values = {}
+	if _has_field("MRP Proposal Batch", "last_validation_on"):
+		values["last_validation_on"] = now_datetime()
+	if _has_field("MRP Proposal Batch", "validation_message"):
+		values["validation_message"] = result.get("validation_message") or ""
+	if values:
+		frappe.db.set_value("MRP Proposal Batch", batch_name, values)
+		if commit:
+			frappe.db.commit()
+
+
 def _ensure_run_can_recalculate(mrp_run: str):
 	applied_batches = frappe.get_all(
 		"MRP Proposal Batch", filters={"mrp_run": mrp_run, "status": "Applied"}, pluck="name"
@@ -872,6 +1322,72 @@ def _format_run_error(exc: Exception) -> str:
 
 def _mrp_job_id(mrp_run: str) -> str:
 	return f"injection_mrp_run_{mrp_run}"
+
+
+def _find_previous_comparable_run(run) -> str | None:
+	filters = {
+		"company": run.get("company"),
+		"run_type": run.get("run_type"),
+		"name": ["!=", run.get("name")],
+		"status": ["in", ["Calculated", "Proposal Generated", "Released"]],
+	}
+	if run.get("modified"):
+		filters["modified"] = ["<", run.get("modified")]
+	rows = frappe.get_all(
+		"MRP Run",
+		filters=filters,
+		fields=["name", "item_code", "customer", "warehouse"],
+		order_by="modified desc",
+		limit_page_length=50,
+	)
+	for candidate in rows:
+		if all((candidate.get(fieldname) or "") == (run.get(fieldname) or "") for fieldname in ("item_code", "customer", "warehouse")):
+			return candidate.name
+	return None
+
+
+def _summarize_run_requirements(mrp_run: str) -> dict[tuple[str, str, str, str], dict[str, Any]]:
+	rows = frappe.get_all(
+		"MRP Requirement Line",
+		filters={"mrp_run": mrp_run},
+		fields=[
+			"item_code",
+			"warehouse",
+			"required_date",
+			"commitment_type",
+			"gross_qty",
+			"net_qty",
+			"new_supply_qty",
+			"prebuy_consumed_qty",
+		],
+		limit_page_length=100000,
+	)
+	result: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+	for row in rows:
+		key = (
+			row.item_code or "",
+			row.warehouse or "",
+			str(row.required_date or ""),
+			row.commitment_type or "",
+		)
+		target = result.setdefault(
+			key,
+			{
+				"item_code": row.item_code,
+				"warehouse": row.warehouse,
+				"required_date": row.required_date,
+				"commitment_type": row.commitment_type,
+				"gross_qty": 0,
+				"net_qty": 0,
+				"new_supply_qty": 0,
+				"prebuy_consumed_qty": 0,
+			},
+		)
+		target["gross_qty"] += flt(row.gross_qty)
+		target["net_qty"] += flt(row.net_qty)
+		target["new_supply_qty"] += flt(row.new_supply_qty)
+		target["prebuy_consumed_qty"] += flt(row.prebuy_consumed_qty)
+	return result
 
 
 def _pagination_args(limit_start: int | str | None, limit_page_length: int | str | None, default_length: int):
@@ -1030,7 +1546,18 @@ def _collect_demands(run, settings) -> list[DemandRow]:
 	demands.extend(_filter_valid_demands(run, _collect_safety_stock_demands(run)))
 	if settings.include_production_plan_as_demand:
 		demands.extend(_filter_valid_demands(run, _collect_production_plan_demands(run)))
-	return _dedupe_demands(demands)
+	return _filter_forecast_fence_demands(run, settings, _dedupe_demands(demands))
+
+
+def _filter_forecast_fence_demands(run, settings, demands: list[DemandRow]) -> list[DemandRow]:
+	if run.run_type != "Forecast Prebuy" or not cint(settings.get("forecast_skip_firm_fence")):
+		return demands
+	fence_end = getdate(add_days(run.planning_date or run.horizon_start or today(), cint(settings.firm_fence_days)))
+	return [
+		row
+		for row in demands
+		if row.required_date and getdate(row.required_date) > fence_end
+	]
 
 
 def _collect_customer_schedule_demands(run) -> list[DemandRow]:
@@ -2804,6 +3331,70 @@ def _create_proposal_batch(run, settings, requirements: list[Any]):
 	)
 	batch.insert(ignore_permissions=True)
 	return batch
+
+
+def _supersede_overlapping_proposal_batches(batch, run):
+	if not _has_field("MRP Proposal Batch", "superseded_by_run"):
+		return
+	proposal_type = batch.proposal_type if batch else run.run_type
+	candidates = frappe.get_all(
+		"MRP Proposal Batch",
+		filters={
+			"company": run.company,
+			"proposal_type": proposal_type,
+			"status": ["in", list(PROPOSAL_ACTIVE_STATUSES)],
+		},
+		fields=["name", "mrp_run"],
+		limit_page_length=5000,
+	)
+	if not candidates:
+		return
+	now_value = now_datetime()
+	for candidate in candidates:
+		if batch and candidate.name == batch.name:
+			continue
+		old_run = _get_run_scope(candidate.mrp_run)
+		if not old_run or not _run_scope_covers(run, old_run):
+			continue
+		values = {
+			"status": "Superseded",
+			"superseded_by_run": run.name,
+			"superseded_on": now_value,
+			"superseded_reason": _("Superseded by newer MRP Run {0}.").format(run.name),
+		}
+		if batch:
+			values["superseded_by_batch"] = batch.name
+		frappe.db.set_value("MRP Proposal Batch", candidate.name, _existing_field_values("MRP Proposal Batch", values))
+
+
+def _get_run_scope(mrp_run: str | None):
+	if not mrp_run:
+		return None
+	fields = ["name", "company", "run_type", "horizon_start", "horizon_end", "item_code", "customer", "warehouse"]
+	return frappe.db.get_value("MRP Run", mrp_run, fields, as_dict=True)
+
+
+def _run_scope_covers(new_run, old_run) -> bool:
+	if not old_run:
+		return False
+	if old_run.company != new_run.company or old_run.run_type != new_run.run_type:
+		return False
+	if old_run.horizon_start and new_run.horizon_start and getdate(old_run.horizon_start) < getdate(new_run.horizon_start):
+		return False
+	if old_run.horizon_end and new_run.horizon_end and getdate(old_run.horizon_end) > getdate(new_run.horizon_end):
+		return False
+	for fieldname in ("item_code", "customer", "warehouse"):
+		old_value = old_run.get(fieldname)
+		new_value = new_run.get(fieldname)
+		if old_value and new_value and old_value != new_value:
+			return False
+		if not old_value and new_value:
+			return False
+	return True
+
+
+def _existing_field_values(doctype: str, values: dict[str, Any]) -> dict[str, Any]:
+	return {fieldname: value for fieldname, value in values.items() if _has_field(doctype, fieldname)}
 
 
 def _apply_proposal_item_values(row, values: dict[str, Any], is_manual_row: bool = False):

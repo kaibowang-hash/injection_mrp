@@ -106,6 +106,12 @@ def apply_proposal_batch(batch_name):
 
 
 @frappe.whitelist()
+def validate_proposal_batch_for_release(batch_name):
+	_require_any_role(RELEASE_ROLES)
+	return planning.validate_proposal_batch_for_release(batch_name)
+
+
+@frappe.whitelist()
 def save_proposal_batch_items(batch_name, items=None):
 	_require_any_role(RELEASE_ROLES)
 	return planning.save_proposal_batch_items(batch_name, _parse_json(items) if isinstance(items, str) else items)
@@ -115,6 +121,12 @@ def save_proposal_batch_items(batch_name, items=None):
 def get_run_console_data(limit=20):
 	_require_any_role(READ_ROLES)
 	return planning.get_run_console_data(limit)
+
+
+@frappe.whitelist()
+def get_run_comparison_data(mrp_run, previous_run=None):
+	_require_any_role(READ_ROLES)
+	return planning.get_run_comparison_data(mrp_run, previous_run)
 
 
 @frappe.whitelist()

@@ -459,3 +459,203 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertEqual(statuses[0], ("Running", None))
 		self.assertEqual(statuses[-1][0], "Failed")
 		self.assertIn("boom", statuses[-1][1])
+
+	def test_forecast_fence_skips_demands_inside_firm_fence_when_enabled(self):
+		run = frappe._dict({"run_type": "Forecast Prebuy", "planning_date": "2026-04-27", "horizon_start": "2026-04-27"})
+		settings = frappe._dict({"forecast_skip_firm_fence": 1, "firm_fence_days": 45})
+		near = planning.DemandRow("Forecast", "FG-001", 1, "2026-05-15", "Test Company")
+		far = planning.DemandRow("Forecast", "FG-002", 1, "2026-06-20", "Test Company")
+
+		result = planning._filter_forecast_fence_demands(run, settings, [near, far])
+
+		self.assertEqual([row.item_code for row in result], ["FG-002"])
+
+	def test_forecast_fence_keeps_existing_behavior_when_disabled(self):
+		run = frappe._dict({"run_type": "Forecast Prebuy", "planning_date": "2026-04-27", "horizon_start": "2026-04-27"})
+		settings = frappe._dict({"forecast_skip_firm_fence": 0, "firm_fence_days": 45})
+		near = planning.DemandRow("Forecast", "FG-001", 1, "2026-05-15", "Test Company")
+
+		result = planning._filter_forecast_fence_demands(run, settings, [near])
+
+		self.assertEqual(result, [near])
+
+	def test_validate_release_blocks_fc_create_mr_with_firm_commitment(self):
+		original_find_newer = planning._find_newer_overlapping_ready_batch
+		planning._find_newer_overlapping_ready_batch = lambda batch, row: None
+		try:
+			batch = frappe._dict(
+				{
+					"name": "MRP-PROP-TEST",
+					"company": "Test Company",
+					"proposal_type": "Forecast Prebuy",
+					"status": "Ready",
+					"items": [
+						frappe._dict(
+							{
+								"name": "ROW-001",
+								"status": "Pending",
+								"action": "Create Material Request",
+								"commitment_type": "Firm",
+								"qty": 10,
+								"item_code": "RM-001",
+								"warehouse": "Stores",
+							}
+						)
+					],
+				}
+			)
+
+			result = planning._validate_proposal_batch_for_release(batch, frappe._dict({}))
+		finally:
+			planning._find_newer_overlapping_ready_batch = original_find_newer
+
+		self.assertFalse(result["valid"])
+		self.assertEqual(result["blocking_issues"][0]["issue_type"], "Commitment Mismatch")
+
+	def test_validate_release_blocks_reduced_current_shortage(self):
+		original_find_newer = planning._find_newer_overlapping_ready_batch
+		original_requirements = planning._get_requirement_validation_map
+		original_get_run = planning._get_validation_run
+		original_supply = planning._get_supply_records
+		planning._find_newer_overlapping_ready_batch = lambda batch, row: None
+		planning._get_requirement_validation_map = lambda names: {
+			"REQ-001": frappe._dict(
+				{
+					"name": "REQ-001",
+					"gross_qty": 100,
+					"material_need_date": "2026-05-20",
+				}
+			)
+		}
+		planning._get_validation_run = lambda mrp_run: frappe._dict({"planning_date": "2026-04-27"})
+		planning._get_supply_records = lambda item_code, company, warehouse, settings, run: [
+			planning.SupplyRecord("Purchase Order", item_code, company, warehouse, 80, 80, "2026-05-01", "2026-05-01", 80)
+		]
+		try:
+			batch = frappe._dict(
+				{
+					"name": "MRP-PROP-TEST",
+					"company": "Test Company",
+					"proposal_type": "Firm APS",
+					"status": "Ready",
+					"mrp_run": "MRP-RUN-TEST",
+					"items": [
+						frappe._dict(
+							{
+								"name": "ROW-001",
+								"status": "Pending",
+								"action": "Create Material Request",
+								"commitment_type": "Firm",
+								"requirement_line": "REQ-001",
+								"qty": 50,
+								"item_code": "RM-001",
+								"warehouse": "Stores",
+								"schedule_date": "2026-05-10",
+							}
+						)
+					],
+				}
+			)
+
+			result = planning._validate_proposal_batch_for_release(batch, frappe._dict({}))
+		finally:
+			planning._find_newer_overlapping_ready_batch = original_find_newer
+			planning._get_requirement_validation_map = original_requirements
+			planning._get_validation_run = original_get_run
+			planning._get_supply_records = original_supply
+
+		self.assertFalse(result["valid"])
+		self.assertEqual(result["blocking_issues"][0]["issue_type"], "Reduced Shortage")
+
+	def test_validate_release_blocks_insufficient_prebuy_consumption(self):
+		original_find_newer = planning._find_newer_overlapping_ready_batch
+		original_prebuy = planning._get_prebuy_supply_records
+		planning._find_newer_overlapping_ready_batch = lambda batch, row: None
+		planning._get_prebuy_supply_records = lambda item_code, company, warehouse: [
+			planning.SupplyRecord("Prebuy", item_code, company, warehouse, 20, 20, "2026-05-01", "2026-05-01", 50)
+		]
+		try:
+			batch = frappe._dict(
+				{
+					"name": "MRP-PROP-TEST",
+					"company": "Test Company",
+					"proposal_type": "Firm APS",
+					"status": "Ready",
+					"items": [
+						frappe._dict(
+							{
+								"name": "ROW-001",
+								"status": "Pending",
+								"action": "Consume Prebuy",
+								"commitment_type": "Prebuy",
+								"qty": 50,
+								"item_code": "RM-001",
+								"warehouse": "Stores",
+								"schedule_date": "2026-05-10",
+							}
+						)
+					],
+				}
+			)
+
+			result = planning._validate_proposal_batch_for_release(batch, frappe._dict({}))
+		finally:
+			planning._find_newer_overlapping_ready_batch = original_find_newer
+			planning._get_prebuy_supply_records = original_prebuy
+
+		self.assertFalse(result["valid"])
+		self.assertEqual(result["blocking_issues"][0]["issue_type"], "Insufficient Prebuy")
+
+	def test_supersede_overlapping_batches_only_updates_active_covered_batches(self):
+		original_has_field = planning._has_field
+		original_get_all = planning.frappe.get_all
+		original_get_scope = planning._get_run_scope
+		original_covers = planning._run_scope_covers
+		original_set_value = planning.frappe.db.set_value
+		updates = []
+		planning._has_field = lambda doctype, fieldname: True
+		planning.frappe.get_all = lambda doctype, **kwargs: [
+			frappe._dict({"name": "MRP-PROP-OLD", "mrp_run": "MRP-RUN-OLD"}),
+			frappe._dict({"name": "MRP-PROP-OTHER", "mrp_run": "MRP-RUN-OTHER"}),
+		]
+		planning._get_run_scope = lambda mrp_run: frappe._dict({"name": mrp_run})
+		planning._run_scope_covers = lambda new_run, old_run: old_run.name == "MRP-RUN-OLD"
+		planning.frappe.db.set_value = lambda doctype, name, values: updates.append((doctype, name, values))
+		try:
+			planning._supersede_overlapping_proposal_batches(
+				frappe._dict({"name": "MRP-PROP-NEW", "proposal_type": "Firm APS"}),
+				frappe._dict({"name": "MRP-RUN-NEW", "company": "Test Company", "run_type": "Firm APS"}),
+			)
+		finally:
+			planning._has_field = original_has_field
+			planning.frappe.get_all = original_get_all
+			planning._get_run_scope = original_get_scope
+			planning._run_scope_covers = original_covers
+			planning.frappe.db.set_value = original_set_value
+
+		self.assertEqual(len(updates), 1)
+		self.assertEqual(updates[0][1], "MRP-PROP-OLD")
+		self.assertEqual(updates[0][2]["status"], "Superseded")
+
+	def test_run_comparison_classifies_delta_rows(self):
+		original_get_all = planning.frappe.get_all
+		def fake_get_all(doctype, **kwargs):
+			mrp_run = kwargs["filters"]["mrp_run"]
+			if mrp_run == "CUR":
+				return [
+					frappe._dict({"item_code": "RM-001", "warehouse": "Stores", "required_date": "2026-05-01", "commitment_type": "Firm", "gross_qty": 10, "net_qty": 8, "new_supply_qty": 8, "prebuy_consumed_qty": 0}),
+					frappe._dict({"item_code": "RM-002", "warehouse": "Stores", "required_date": "2026-05-01", "commitment_type": "Firm", "gross_qty": 4, "net_qty": 4, "new_supply_qty": 4, "prebuy_consumed_qty": 0}),
+				]
+			return [
+				frappe._dict({"item_code": "RM-001", "warehouse": "Stores", "required_date": "2026-05-01", "commitment_type": "Firm", "gross_qty": 10, "net_qty": 5, "new_supply_qty": 5, "prebuy_consumed_qty": 0}),
+				frappe._dict({"item_code": "RM-003", "warehouse": "Stores", "required_date": "2026-05-01", "commitment_type": "Firm", "gross_qty": 2, "net_qty": 2, "new_supply_qty": 2, "prebuy_consumed_qty": 0}),
+			]
+		planning.frappe.get_all = fake_get_all
+		try:
+			current = planning._summarize_run_requirements("CUR")
+			previous = planning._summarize_run_requirements("PREV")
+		finally:
+			planning.frappe.get_all = original_get_all
+
+		self.assertEqual(current[("RM-001", "Stores", "2026-05-01", "Firm")]["net_qty"], 8)
+		self.assertEqual(previous[("RM-003", "Stores", "2026-05-01", "Firm")]["net_qty"], 2)

@@ -18,6 +18,7 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 		{ label: __("Planning Date"), fieldname: "planning_date", formatter: ui.format_date },
 		{ label: __("Horizon End"), fieldname: "horizon_end", formatter: ui.format_date },
 		{ label: __("APS Run"), fieldname: "aps_run", formatter: (value) => (value ? ui.doc_link("APS Planning Run", value) : "") },
+		{ label: __("Previous"), fieldname: "previous_run", formatter: (value) => (value ? ui.doc_link("MRP Run", value) : "") },
 		{ label: __("Demand"), fieldname: "demand_count", numeric: true },
 		{ label: __("Requirements"), fieldname: "requirement_count", numeric: true },
 		{ label: __("Exceptions"), fieldname: "exception_count", numeric: true },
@@ -68,8 +69,43 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 			export_title: __("MRP Run Console"),
 			export_file_name: "mrp_runs",
 			legend_columns: [{ fieldname: "run_type" }, { fieldname: "status", kind: "status" }],
+			on_row_click: open_comparison,
 		});
 		schedule_refresh();
+	}
+
+	async function open_comparison(row) {
+		if (!row || !row.name) {
+			return;
+		}
+		const data = await ui.with_busy(__("Loading run comparison..."), () =>
+			ui.xcall("injection_mrp.api.app.get_run_comparison_data", { mrp_run: row.name })
+		);
+		const summary = data.summary || {};
+		const comparisonColumns = [
+			{ label: __("Change"), fieldname: "change_type", formatter: (value) => ui.code_badge(value, { tone: value === "Increased" ? "orange" : value === "Decreased" ? "blue" : value === "Removed" ? "red" : "green" }) },
+			{ label: __("Item"), fieldname: "item_code" },
+			{ label: __("Warehouse"), fieldname: "warehouse" },
+			{ label: __("Required Date"), fieldname: "required_date", formatter: ui.format_date },
+			{ label: __("Commitment"), fieldname: "commitment_type", formatter: (value) => ui.code_badge(value, { tone: value === "Prebuy" ? "orange" : "green" }) },
+			{ label: __("Previous Net"), fieldname: "previous_net_qty", formatter: ui.format_number },
+			{ label: __("Current Net"), fieldname: "current_net_qty", formatter: ui.format_number },
+			{ label: __("Delta"), fieldname: "delta_net_qty", formatter: ui.format_number },
+		];
+		ui.open_drawer(row.name, [
+			{
+				title: __("Run Comparison"),
+				rows: [
+					{ label: __("Current Run"), html: ui.doc_link("MRP Run", row.name) },
+					{ label: __("Previous Run"), html: data.previous_run ? ui.doc_link("MRP Run", data.previous_run.name) : "" },
+					{ label: __("Summary"), value: Object.keys(summary).map((key) => `${__(key)}: ${summary[key]}`).join(" · ") },
+				],
+			},
+			{
+				title: __("Requirement Changes"),
+				html: ui.mini_table_html(comparisonColumns, data.rows || [], __("No comparable requirements found.")),
+			},
+		]);
 	}
 
 	function open_run_dialog(method, title) {
