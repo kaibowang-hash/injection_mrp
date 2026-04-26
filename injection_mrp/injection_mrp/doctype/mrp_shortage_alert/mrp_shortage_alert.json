@@ -1,0 +1,274 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "MRP-SHORT-.#####",
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mrp_run",
+  "company",
+  "item_code",
+  "item_name",
+  "warehouse",
+  "warning_level",
+  "status",
+  "first_shortage_date",
+  "shortage_qty",
+  "lowest_projected_qty",
+  "safety_stock_qty",
+  "safety_stock_gap_qty",
+  "latest_order_date",
+  "affected_requirement_count",
+  "affected_requirements",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "mrp_run",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "MRP Run",
+   "options": "MRP Run",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "warning_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Warning Level",
+   "options": "\nWarning\nCritical"
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "\nOpen\nReviewed\nClosed"
+  },
+  {
+   "fieldname": "first_shortage_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "First Shortage Date"
+  },
+  {
+   "fieldname": "shortage_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Shortage Qty"
+  },
+  {
+   "fieldname": "lowest_projected_qty",
+   "fieldtype": "Float",
+   "label": "Lowest Projected Qty"
+  },
+  {
+   "fieldname": "safety_stock_qty",
+   "fieldtype": "Float",
+   "label": "Safety Stock Qty"
+  },
+  {
+   "fieldname": "safety_stock_gap_qty",
+   "fieldtype": "Float",
+   "label": "Safety Stock Gap Qty"
+  },
+  {
+   "fieldname": "latest_order_date",
+   "fieldtype": "Date",
+   "label": "Latest Order Date"
+  },
+  {
+   "fieldname": "affected_requirement_count",
+   "fieldtype": "Int",
+   "label": "Affected Requirement Count"
+  },
+  {
+   "fieldname": "affected_requirements",
+   "fieldtype": "Long Text",
+   "label": "Affected Requirements"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Shortage Alert",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "first_shortage_date",
+ "sort_order": "ASC",
+ "track_changes": 1
+}

@@ -1,0 +1,51 @@
+{
+ "content": null,
+ "doctype": "Page",
+ "module": "Injection MRP",
+ "name": "mrp-run-console",
+ "page_name": "mrp-run-console",
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "MPLM"
+  },
+  {
+   "role": "MPLP"
+  },
+  {
+   "role": "GMC"
+  },
+  {
+   "role": "PMC"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Manufacturing Manager"
+  },
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  }
+ ],
+ "standard": "Yes",
+ "system_page": 0,
+ "title": "MRP Run Console"
+}

@@ -1,0 +1,302 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "MRP-SR-.#####",
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "enabled",
+  "priority",
+  "company",
+  "match_section",
+  "item_code",
+  "item_group",
+  "customer",
+  "warehouse",
+  "route_section",
+  "supply_mode",
+  "material_request_type",
+  "source_warehouse",
+  "target_warehouse",
+  "supplier",
+  "purchase_constraint_section",
+  "purchase_uom",
+  "min_order_qty",
+  "order_multiple_qty",
+  "supplier_lead_time_days",
+  "notes"
+ ],
+ "fields": [
+  {
+   "default": "1",
+   "fieldname": "enabled",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Enabled"
+  },
+  {
+   "default": "100",
+   "fieldname": "priority",
+   "fieldtype": "Int",
+   "in_list_view": 1,
+   "label": "Priority"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "match_section",
+   "fieldtype": "Section Break",
+   "label": "Match"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "item_group",
+   "fieldtype": "Link",
+   "label": "Item Group",
+   "options": "Item Group"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "route_section",
+   "fieldtype": "Section Break",
+   "label": "Supply Route"
+  },
+  {
+   "default": "Purchase",
+   "fieldname": "supply_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Supply Mode",
+   "options": "\nPurchase\nManufacture\nSubcontracting\nCustomer Provided\nMaterial Transfer\nSupplier Supplied\nNo Action"
+  },
+  {
+   "fieldname": "material_request_type",
+   "fieldtype": "Select",
+   "label": "Material Request Type",
+   "options": "\nPurchase\nMaterial Transfer\nMaterial Issue\nManufacture\nSubcontracting\nCustomer Provided"
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "label": "Target Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "purchase_constraint_section",
+   "fieldtype": "Section Break",
+   "label": "Purchase Constraints"
+  },
+  {
+   "fieldname": "purchase_uom",
+   "fieldtype": "Link",
+   "label": "Purchase UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "min_order_qty",
+   "fieldtype": "Float",
+   "label": "Minimum Order Qty"
+  },
+  {
+   "description": "MRP rounds suggested order quantity up to a multiple of this quantity. Leave blank to use Item Price Packing Unit when available.",
+   "fieldname": "order_multiple_qty",
+   "fieldtype": "Float",
+   "label": "Order Multiple Qty"
+  },
+  {
+   "fieldname": "supplier_lead_time_days",
+   "fieldtype": "Int",
+   "label": "Supplier Lead Time Days"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Supply Rule",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "priority",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

@@ -1,0 +1,299 @@
+{
+ "actions": [],
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "horizon_section",
+  "firm_horizon_days",
+  "prebuy_horizon_days",
+  "forecast_consumption_window_days",
+  "material_staging_days",
+  "warning_section",
+  "early_supply_warning_days",
+  "late_supply_tolerance_days",
+  "warn_missing_lead_time",
+  "use_material_need_date_for_pegging",
+  "rolling_daily_horizon_days",
+  "policy_section",
+  "allow_prebuy_material_request",
+  "include_production_plan_as_supply",
+  "include_production_plan_as_demand",
+  "auto_submit_material_request",
+  "defaults_section",
+  "default_material_request_type",
+  "default_source_warehouse",
+  "default_target_warehouse"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Default Company",
+   "options": "Company"
+  },
+  {
+   "fieldname": "horizon_section",
+   "fieldtype": "Section Break",
+   "label": "Planning Horizons"
+  },
+  {
+   "default": "45",
+   "fieldname": "firm_horizon_days",
+   "fieldtype": "Int",
+   "label": "Firm Horizon Days"
+  },
+  {
+   "default": "120",
+   "fieldname": "prebuy_horizon_days",
+   "fieldtype": "Int",
+   "label": "Prebuy Horizon Days"
+  },
+  {
+   "default": "30",
+   "fieldname": "forecast_consumption_window_days",
+   "fieldtype": "Int",
+   "label": "Forecast Consumption Window Days"
+  },
+  {
+   "default": "7",
+   "fieldname": "material_staging_days",
+   "fieldtype": "Int",
+   "label": "Material Staging Days"
+  },
+  {
+   "fieldname": "warning_section",
+   "fieldtype": "Section Break",
+   "label": "Pegging and Warnings"
+  },
+  {
+   "default": "7",
+   "fieldname": "early_supply_warning_days",
+   "fieldtype": "Int",
+   "label": "Early Supply Warning Days"
+  },
+  {
+   "default": "0",
+   "fieldname": "late_supply_tolerance_days",
+   "fieldtype": "Int",
+   "label": "Late Supply Tolerance Days"
+  },
+  {
+   "default": "1",
+   "fieldname": "warn_missing_lead_time",
+   "fieldtype": "Check",
+   "label": "Warn Missing Lead Time"
+  },
+  {
+   "default": "1",
+   "fieldname": "use_material_need_date_for_pegging",
+   "fieldtype": "Check",
+   "label": "Use Material Need Date For Pegging"
+  },
+  {
+   "default": "60",
+   "fieldname": "rolling_daily_horizon_days",
+   "fieldtype": "Int",
+   "label": "Rolling Daily Horizon Days"
+  },
+  {
+   "fieldname": "policy_section",
+   "fieldtype": "Section Break",
+   "label": "Policies"
+  },
+  {
+   "default": "1",
+   "fieldname": "allow_prebuy_material_request",
+   "fieldtype": "Check",
+   "label": "Allow Prebuy Material Request"
+  },
+  {
+   "default": "1",
+   "fieldname": "include_production_plan_as_supply",
+   "fieldtype": "Check",
+   "label": "Include Production Plan As Supply"
+  },
+  {
+   "default": "0",
+   "fieldname": "include_production_plan_as_demand",
+   "fieldtype": "Check",
+   "label": "Include Production Plan As Demand"
+  },
+  {
+   "default": "0",
+   "fieldname": "auto_submit_material_request",
+   "fieldtype": "Check",
+   "label": "Auto Submit Material Request"
+  },
+  {
+   "fieldname": "defaults_section",
+   "fieldtype": "Section Break",
+   "label": "Defaults"
+  },
+  {
+   "default": "Purchase",
+   "fieldname": "default_material_request_type",
+   "fieldtype": "Select",
+   "label": "Default Material Request Type",
+   "options": "\nPurchase\nMaterial Transfer\nMaterial Issue\nManufacture\nSubcontracting\nCustomer Provided"
+  },
+  {
+   "fieldname": "default_source_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "default_target_warehouse",
+   "fieldtype": "Link",
+   "label": "Default Target Warehouse",
+   "options": "Warehouse"
+  }
+ ],
+ "issingle": 1,
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Settings",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

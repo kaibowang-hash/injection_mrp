@@ -1,0 +1,309 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "MRP-DEM-.#####",
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mrp_run",
+  "company",
+  "demand_type",
+  "status",
+  "source_section",
+  "source_doctype",
+  "source_name",
+  "source_row",
+  "customer",
+  "aps_run",
+  "aps_result",
+  "item_section",
+  "item_code",
+  "item_name",
+  "bom",
+  "warehouse",
+  "required_date",
+  "demand_qty",
+  "remaining_qty",
+  "consumed_by_firm_qty",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "mrp_run",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "MRP Run",
+   "options": "MRP Run",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "demand_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Demand Type",
+   "options": "\nForecast\nSales Order\nSafety Stock\nAPS\nProduction Plan\nManual",
+   "reqd": 1
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "\nOpen\nConsumed\nClosed\nCancelled"
+  },
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "fieldname": "source_doctype",
+   "fieldtype": "Data",
+   "label": "Source DocType"
+  },
+  {
+   "fieldname": "source_name",
+   "fieldtype": "Dynamic Link",
+   "label": "Source Name",
+   "options": "source_doctype"
+  },
+  {
+   "fieldname": "source_row",
+   "fieldtype": "Data",
+   "label": "Source Row"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "aps_run",
+   "fieldtype": "Link",
+   "label": "APS Run",
+   "options": "APS Planning Run"
+  },
+  {
+   "fieldname": "aps_result",
+   "fieldtype": "Link",
+   "label": "APS Result",
+   "options": "APS Schedule Result"
+  },
+  {
+   "fieldname": "item_section",
+   "fieldtype": "Section Break",
+   "label": "Demand Item"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "bom",
+   "fieldtype": "Link",
+   "label": "BOM",
+   "options": "BOM"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "required_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Required Date"
+  },
+  {
+   "fieldname": "demand_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Demand Qty"
+  },
+  {
+   "fieldname": "remaining_qty",
+   "fieldtype": "Float",
+   "label": "Remaining Qty"
+  },
+  {
+   "fieldname": "consumed_by_firm_qty",
+   "fieldtype": "Float",
+   "label": "Consumed By Firm Qty"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Demand Snapshot",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "required_date",
+ "sort_order": "ASC",
+ "track_changes": 1
+}

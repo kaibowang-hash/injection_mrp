@@ -1,0 +1,213 @@
+{
+ "app": "injection_mrp",
+ "charts": [],
+ "content": "[{\"id\":\"header-injection-mrp\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Injection MRP</b></span>\",\"col\":12}},{\"id\":\"text-injection-mrp\",\"type\":\"paragraph\",\"data\":{\"text\":\"Forecast prebuy, firm APS material demand, BOM explosion, supply offsets, rolling shortage alerts, prebuy consumption and Material Request release for injection manufacturing.\",\"col\":12}},{\"id\":\"shortcut-demand-console\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Demand Console\",\"col\":2}},{\"id\":\"shortcut-material-workbench\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Material Workbench\",\"col\":2}},{\"id\":\"shortcut-pegging-detail\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Pegging Detail\",\"col\":2}},{\"id\":\"shortcut-shortage-timeline\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Shortage Timeline\",\"col\":2}},{\"id\":\"shortcut-run-console\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Run Console\",\"col\":2}},{\"id\":\"shortcut-release-center\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Release Center\",\"col\":2}},{\"id\":\"spacer-1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"card-console\",\"type\":\"card\",\"data\":{\"card_name\":\"MRP Console\",\"col\":4}},{\"id\":\"card-transactions\",\"type\":\"card\",\"data\":{\"card_name\":\"Transactions\",\"col\":4}},{\"id\":\"card-config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}}]",
+ "custom_blocks": [],
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "stock",
+ "is_hidden": 0,
+ "label": "Injection MRP",
+ "links": [
+  {
+   "label": "MRP Console",
+   "link_count": 6,
+   "link_type": "Page",
+   "type": "Card Break"
+  },
+  {
+   "label": "MRP Demand Console",
+   "link_to": "mrp-demand-console",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Material Workbench",
+   "link_to": "mrp-material-workbench",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Pegging Detail",
+   "link_to": "mrp-pegging-detail",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Shortage Timeline",
+   "link_to": "mrp-shortage-timeline",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Run Console",
+   "link_to": "mrp-run-console",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Release Center",
+   "link_to": "mrp-release-center",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "Transactions",
+   "link_count": 8,
+   "link_type": "DocType",
+   "type": "Card Break"
+  },
+  {
+   "label": "MRP Run",
+   "link_to": "MRP Run",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Demand Snapshot",
+   "link_to": "MRP Demand Snapshot",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Requirement Line",
+   "link_to": "MRP Requirement Line",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Pegging Line",
+   "link_to": "MRP Pegging Line",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Rolling Balance Line",
+   "link_to": "MRP Rolling Balance Line",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Shortage Alert",
+   "link_to": "MRP Shortage Alert",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Proposal Batch",
+   "link_to": "MRP Proposal Batch",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Exception Log",
+   "link_to": "MRP Exception Log",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "Configuration",
+   "link_count": 2,
+   "link_type": "DocType",
+   "type": "Card Break"
+  },
+  {
+   "label": "MRP Settings",
+   "link_to": "MRP Settings",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Supply Rule",
+   "link_to": "MRP Supply Rule",
+   "link_type": "DocType",
+   "type": "Link"
+  }
+ ],
+ "module": "Injection MRP",
+ "name": "Injection MRP",
+ "public": 1,
+ "roles": [
+  {
+   "role": "System Manager"
+  },
+  {
+   "role": "MPLM"
+  },
+  {
+   "role": "MPLP"
+  },
+  {
+   "role": "GMC"
+  },
+  {
+   "role": "PMC"
+  },
+  {
+   "role": "Purchase Manager"
+  },
+  {
+   "role": "Purchase User"
+  },
+  {
+   "role": "Manufacturing Manager"
+  },
+  {
+   "role": "Manufacturing User"
+  },
+  {
+   "role": "Stock Manager"
+  },
+  {
+   "role": "Stock User"
+  },
+  {
+   "role": "Sales Manager"
+  },
+  {
+   "role": "Sales User"
+  }
+ ],
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "label": "MRP Demand Console",
+   "link_to": "mrp-demand-console",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "label": "MRP Material Workbench",
+   "link_to": "mrp-material-workbench",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "label": "MRP Pegging Detail",
+   "link_to": "mrp-pegging-detail",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "label": "MRP Shortage Timeline",
+   "link_to": "mrp-shortage-timeline",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "label": "MRP Run Console",
+   "link_to": "mrp-run-console",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "label": "MRP Release Center",
+   "link_to": "mrp-release-center",
+   "type": "Page"
+  }
+ ],
+ "sequence_id": 100.0,
+ "title": "Injection MRP",
+ "type": "Workspace"
+}

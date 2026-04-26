@@ -1,0 +1,447 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "MRP-PEG-.#####",
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mrp_run",
+  "requirement_line",
+  "demand_snapshot",
+  "company",
+  "run_type",
+  "commitment_type",
+  "status",
+  "demand_section",
+  "demand_type",
+  "demand_source_doctype",
+  "demand_source_name",
+  "demand_source_row",
+  "demand_item_code",
+  "item_code",
+  "item_name",
+  "uom",
+  "warehouse",
+  "required_date",
+  "material_need_date",
+  "demand_qty",
+  "supply_section",
+  "supply_type",
+  "supply_doctype",
+  "supply_name",
+  "supply_row",
+  "original_supply_qty",
+  "supply_qty",
+  "remaining_supply_qty",
+  "supply_date",
+  "expected_arrival_date",
+  "supply_priority",
+  "lead_section",
+  "lead_time_days",
+  "suggested_order_date",
+  "delivery_variance_days",
+  "advice_section",
+  "adjustment_action",
+  "adjustment_qty",
+  "adjustment_date",
+  "warning_level",
+  "warning_category",
+  "warning_reason",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "mrp_run",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "MRP Run",
+   "options": "MRP Run",
+   "reqd": 1
+  },
+  {
+   "fieldname": "requirement_line",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Requirement Line",
+   "options": "MRP Requirement Line"
+  },
+  {
+   "fieldname": "demand_snapshot",
+   "fieldtype": "Link",
+   "label": "Demand Snapshot",
+   "options": "MRP Demand Snapshot"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "run_type",
+   "fieldtype": "Select",
+   "label": "Run Type",
+   "options": "\nForecast Prebuy\nFirm APS\nManual"
+  },
+  {
+   "fieldname": "commitment_type",
+   "fieldtype": "Select",
+   "label": "Commitment Type",
+   "options": "\nPrebuy\nFirm"
+  },
+  {
+   "default": "Open",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "label": "Status",
+   "options": "\nOpen\nAllocated\nProposed\nExcess\nClosed"
+  },
+  {
+   "fieldname": "demand_section",
+   "fieldtype": "Section Break",
+   "label": "Demand"
+  },
+  {
+   "fieldname": "demand_type",
+   "fieldtype": "Data",
+   "label": "Demand Type"
+  },
+  {
+   "fieldname": "demand_source_doctype",
+   "fieldtype": "Data",
+   "label": "Demand Source DocType"
+  },
+  {
+   "fieldname": "demand_source_name",
+   "fieldtype": "Data",
+   "label": "Demand Source Name"
+  },
+  {
+   "fieldname": "demand_source_row",
+   "fieldtype": "Data",
+   "label": "Demand Source Row"
+  },
+  {
+   "fieldname": "demand_item_code",
+   "fieldtype": "Link",
+   "label": "Demand Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "required_date",
+   "fieldtype": "Date",
+   "label": "Required Date"
+  },
+  {
+   "fieldname": "material_need_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Material Need Date"
+  },
+  {
+   "fieldname": "demand_qty",
+   "fieldtype": "Float",
+   "label": "Demand Qty"
+  },
+  {
+   "fieldname": "supply_section",
+   "fieldtype": "Section Break",
+   "label": "Supply"
+  },
+  {
+   "fieldname": "supply_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Supply Type",
+   "options": "\nStock\nMaterial Request\nPurchase Order\nWork Order\nProduction Plan\nPrebuy\nPlanned Supply"
+  },
+  {
+   "fieldname": "supply_doctype",
+   "fieldtype": "Data",
+   "label": "Supply DocType"
+  },
+  {
+   "fieldname": "supply_name",
+   "fieldtype": "Data",
+   "label": "Supply Document"
+  },
+  {
+   "fieldname": "supply_row",
+   "fieldtype": "Data",
+   "label": "Supply Row"
+  },
+  {
+   "fieldname": "original_supply_qty",
+   "fieldtype": "Float",
+   "label": "Original Supply Qty"
+  },
+  {
+   "fieldname": "supply_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Supply Qty"
+  },
+  {
+   "fieldname": "remaining_supply_qty",
+   "fieldtype": "Float",
+   "label": "Remaining Supply Qty"
+  },
+  {
+   "fieldname": "supply_date",
+   "fieldtype": "Date",
+   "label": "Supply Date"
+  },
+  {
+   "fieldname": "expected_arrival_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Expected Arrival Date"
+  },
+  {
+   "fieldname": "supply_priority",
+   "fieldtype": "Int",
+   "label": "Supply Priority"
+  },
+  {
+   "fieldname": "lead_section",
+   "fieldtype": "Section Break",
+   "label": "Lead Time"
+  },
+  {
+   "fieldname": "lead_time_days",
+   "fieldtype": "Int",
+   "label": "Lead Time Days"
+  },
+  {
+   "fieldname": "suggested_order_date",
+   "fieldtype": "Date",
+   "label": "Suggested Order Date"
+  },
+  {
+   "fieldname": "delivery_variance_days",
+   "fieldtype": "Int",
+   "label": "Delivery Variance Days"
+  },
+  {
+   "fieldname": "advice_section",
+   "fieldtype": "Section Break",
+   "label": "Advice"
+  },
+  {
+   "fieldname": "adjustment_action",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Adjustment Action",
+   "options": "\nNo Adjustment\nExpedite\nDelay\nCancel\nReview\nCreate Material Request\nConsume Prebuy\nReview Excess Prebuy"
+  },
+  {
+   "fieldname": "adjustment_qty",
+   "fieldtype": "Float",
+   "label": "Adjustment Qty"
+  },
+  {
+   "fieldname": "adjustment_date",
+   "fieldtype": "Date",
+   "label": "Adjustment Date"
+  },
+  {
+   "fieldname": "warning_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Warning Level",
+   "options": "\nNone\nInfo\nWarning\nCritical"
+  },
+  {
+   "fieldname": "warning_category",
+   "fieldtype": "Data",
+   "label": "Warning Category"
+  },
+  {
+   "fieldname": "warning_reason",
+   "fieldtype": "Small Text",
+   "label": "Warning Reason"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Pegging Line",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "material_need_date",
+ "sort_order": "ASC",
+ "track_changes": 1
+}

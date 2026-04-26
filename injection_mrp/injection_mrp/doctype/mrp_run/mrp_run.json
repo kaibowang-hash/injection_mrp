@@ -1,0 +1,324 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "MRP-RUN-.#####",
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "run_type",
+  "status",
+  "planning_date",
+  "horizon_days",
+  "horizon_start",
+  "horizon_end",
+  "aps_run",
+  "filters_section",
+  "item_code",
+  "customer",
+  "warehouse",
+  "summary_section",
+  "demand_count",
+  "requirement_count",
+  "exception_count",
+  "total_gross_qty",
+  "total_net_qty",
+  "total_proposed_qty",
+  "proposal_batch",
+  "source_summary",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "default": "Forecast Prebuy",
+   "fieldname": "run_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Run Type",
+   "options": "\nForecast Prebuy\nFirm APS\nManual",
+   "reqd": 1
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "\nDraft\nCalculated\nProposal Generated\nReleased\nClosed\nCancelled",
+   "read_only": 1
+  },
+  {
+   "default": "Today",
+   "fieldname": "planning_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Planning Date",
+   "reqd": 1
+  },
+  {
+   "fieldname": "horizon_days",
+   "fieldtype": "Int",
+   "label": "Horizon Days"
+  },
+  {
+   "fieldname": "horizon_start",
+   "fieldtype": "Date",
+   "label": "Horizon Start",
+   "read_only": 1
+  },
+  {
+   "fieldname": "horizon_end",
+   "fieldtype": "Date",
+   "label": "Horizon End",
+   "read_only": 1
+  },
+  {
+   "fieldname": "aps_run",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "APS Run",
+   "options": "APS Planning Run"
+  },
+  {
+   "fieldname": "filters_section",
+   "fieldtype": "Section Break",
+   "label": "Filters"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "label": "Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "summary_section",
+   "fieldtype": "Section Break",
+   "label": "Summary"
+  },
+  {
+   "fieldname": "demand_count",
+   "fieldtype": "Int",
+   "label": "Demand Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "requirement_count",
+   "fieldtype": "Int",
+   "label": "Requirement Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "exception_count",
+   "fieldtype": "Int",
+   "label": "Exception Count",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_gross_qty",
+   "fieldtype": "Float",
+   "label": "Total Gross Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_net_qty",
+   "fieldtype": "Float",
+   "label": "Total Net Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "total_proposed_qty",
+   "fieldtype": "Float",
+   "label": "Total Proposed Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "proposal_batch",
+   "fieldtype": "Link",
+   "label": "Proposal Batch",
+   "options": "MRP Proposal Batch",
+   "read_only": 1
+  },
+  {
+   "fieldname": "source_summary",
+   "fieldtype": "Small Text",
+   "label": "Source Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Run",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "delete": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "track_changes": 1
+}

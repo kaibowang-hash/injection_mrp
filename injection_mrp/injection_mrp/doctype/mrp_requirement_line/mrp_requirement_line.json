@@ -1,0 +1,604 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "MRP-REQ-.#####",
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mrp_run",
+  "demand_snapshot",
+  "company",
+  "run_type",
+  "status",
+  "requirement_type",
+  "commitment_type",
+  "supply_mode",
+  "material_request_type",
+  "item_section",
+  "item_code",
+  "item_name",
+  "uom",
+  "warehouse",
+  "source_warehouse",
+  "supplier",
+  "supplier_lead_time_days",
+  "customer",
+  "required_date",
+  "material_need_date",
+  "suggested_order_date",
+  "expected_arrival_date",
+  "lead_time_days",
+  "delivery_variance_days",
+  "source_section",
+  "demand_item_code",
+  "bom",
+  "bom_item",
+  "bom_level",
+  "parent_requirement",
+  "calculation_section",
+  "gross_qty",
+  "scrap_qty",
+  "available_qty",
+  "open_mr_qty",
+  "open_po_qty",
+  "open_wo_qty",
+  "production_plan_supply_qty",
+  "prebuy_available_qty",
+  "prebuy_consumed_qty",
+  "pegged_supply_qty",
+  "new_supply_qty",
+  "early_supply_qty",
+  "late_supply_qty",
+  "net_qty",
+  "shortage_qty",
+  "procurement_section",
+  "purchase_uom",
+  "min_order_qty",
+  "order_multiple_qty",
+  "order_excess_qty",
+  "supplier_quotation",
+  "item_price",
+  "estimated_rate",
+  "estimated_amount",
+  "currency",
+  "procurement_source",
+  "procurement_constraint_summary",
+  "first_shortage_date",
+  "lowest_projected_qty",
+  "warning_count",
+  "adjustment_summary",
+  "warning_summary",
+  "trace_section",
+  "supply_trace",
+  "bom_trace",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "mrp_run",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "MRP Run",
+   "options": "MRP Run",
+   "reqd": 1
+  },
+  {
+   "fieldname": "demand_snapshot",
+   "fieldtype": "Link",
+   "label": "Demand Snapshot",
+   "options": "MRP Demand Snapshot"
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "run_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Run Type",
+   "options": "\nForecast Prebuy\nFirm APS\nManual"
+  },
+  {
+   "default": "Draft",
+   "fieldname": "status",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Status",
+   "options": "\nDraft\nReady\nException\nReleased\nConsumed\nClosed"
+  },
+  {
+   "default": "Raw Material",
+   "fieldname": "requirement_type",
+   "fieldtype": "Select",
+   "label": "Requirement Type",
+   "options": "\nRaw Material\nIntermediate\nPackaging\nSubcontract\nFinished Good"
+  },
+  {
+   "default": "Firm",
+   "fieldname": "commitment_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Commitment Type",
+   "options": "\nPrebuy\nFirm"
+  },
+  {
+   "fieldname": "supply_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Supply Mode",
+   "options": "\nPurchase\nManufacture\nSubcontracting\nCustomer Provided\nMaterial Transfer\nSupplier Supplied\nNo Action"
+  },
+  {
+   "fieldname": "material_request_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Material Request Type",
+   "options": "\nPurchase\nMaterial Transfer\nMaterial Issue\nManufacture\nSubcontracting\nCustomer Provided"
+  },
+  {
+   "fieldname": "item_section",
+   "fieldtype": "Section Break",
+   "label": "Item"
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "uom",
+   "fieldtype": "Link",
+   "label": "UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "label": "Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "supplier",
+   "fieldtype": "Link",
+   "label": "Supplier",
+   "options": "Supplier"
+  },
+  {
+   "fieldname": "supplier_lead_time_days",
+   "fieldtype": "Int",
+   "label": "Supplier Lead Time Days"
+  },
+  {
+   "fieldname": "customer",
+   "fieldtype": "Link",
+   "label": "Customer",
+   "options": "Customer"
+  },
+  {
+   "fieldname": "required_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Required Date"
+  },
+  {
+   "fieldname": "material_need_date",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Material Need Date"
+  },
+  {
+   "fieldname": "suggested_order_date",
+   "fieldtype": "Date",
+   "label": "Suggested Order Date"
+  },
+  {
+   "fieldname": "expected_arrival_date",
+   "fieldtype": "Date",
+   "label": "Expected Arrival Date"
+  },
+  {
+   "fieldname": "lead_time_days",
+   "fieldtype": "Int",
+   "label": "Lead Time Days"
+  },
+  {
+   "fieldname": "delivery_variance_days",
+   "fieldtype": "Int",
+   "label": "Delivery Variance Days"
+  },
+  {
+   "fieldname": "source_section",
+   "fieldtype": "Section Break",
+   "label": "Source"
+  },
+  {
+   "fieldname": "demand_item_code",
+   "fieldtype": "Link",
+   "label": "Demand Item",
+   "options": "Item"
+  },
+  {
+   "fieldname": "bom",
+   "fieldtype": "Link",
+   "label": "BOM",
+   "options": "BOM"
+  },
+  {
+   "fieldname": "bom_item",
+   "fieldtype": "Data",
+   "label": "BOM Item Row"
+  },
+  {
+   "fieldname": "bom_level",
+   "fieldtype": "Int",
+   "label": "BOM Level"
+  },
+  {
+   "fieldname": "parent_requirement",
+   "fieldtype": "Data",
+   "label": "Parent Requirement"
+  },
+  {
+   "fieldname": "calculation_section",
+   "fieldtype": "Section Break",
+   "label": "Calculation"
+  },
+  {
+   "fieldname": "gross_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Gross Qty"
+  },
+  {
+   "fieldname": "scrap_qty",
+   "fieldtype": "Float",
+   "label": "Scrap Qty"
+  },
+  {
+   "fieldname": "available_qty",
+   "fieldtype": "Float",
+   "label": "Available Qty"
+  },
+  {
+   "fieldname": "open_mr_qty",
+   "fieldtype": "Float",
+   "label": "Open MR Qty"
+  },
+  {
+   "fieldname": "open_po_qty",
+   "fieldtype": "Float",
+   "label": "Open PO Qty"
+  },
+  {
+   "fieldname": "open_wo_qty",
+   "fieldtype": "Float",
+   "label": "Open WO Qty"
+  },
+  {
+   "fieldname": "production_plan_supply_qty",
+   "fieldtype": "Float",
+   "label": "Production Plan Supply Qty"
+  },
+  {
+   "fieldname": "prebuy_available_qty",
+   "fieldtype": "Float",
+   "label": "Prebuy Available Qty"
+  },
+  {
+   "fieldname": "prebuy_consumed_qty",
+   "fieldtype": "Float",
+   "label": "Prebuy Consumed Qty"
+  },
+  {
+   "fieldname": "pegged_supply_qty",
+   "fieldtype": "Float",
+   "label": "Pegged Supply Qty"
+  },
+  {
+   "fieldname": "new_supply_qty",
+   "fieldtype": "Float",
+   "label": "New Supply Qty"
+  },
+  {
+   "fieldname": "early_supply_qty",
+   "fieldtype": "Float",
+   "label": "Early Supply Qty"
+  },
+  {
+   "fieldname": "late_supply_qty",
+   "fieldtype": "Float",
+   "label": "Late Supply Qty"
+  },
+  {
+   "fieldname": "net_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Net Qty"
+  },
+  {
+   "fieldname": "shortage_qty",
+   "fieldtype": "Float",
+   "label": "Shortage Qty"
+  },
+  {
+   "fieldname": "procurement_section",
+   "fieldtype": "Section Break",
+   "label": "Procurement Constraints"
+  },
+  {
+   "fieldname": "purchase_uom",
+   "fieldtype": "Link",
+   "label": "Purchase UOM",
+   "options": "UOM"
+  },
+  {
+   "fieldname": "min_order_qty",
+   "fieldtype": "Float",
+   "label": "Minimum Order Qty"
+  },
+  {
+   "fieldname": "order_multiple_qty",
+   "fieldtype": "Float",
+   "label": "Order Multiple Qty"
+  },
+  {
+   "fieldname": "order_excess_qty",
+   "fieldtype": "Float",
+   "label": "Order Excess Qty"
+  },
+  {
+   "fieldname": "supplier_quotation",
+   "fieldtype": "Link",
+   "label": "Supplier Quotation",
+   "options": "Supplier Quotation"
+  },
+  {
+   "fieldname": "item_price",
+   "fieldtype": "Link",
+   "label": "Item Price",
+   "options": "Item Price"
+  },
+  {
+   "fieldname": "estimated_rate",
+   "fieldtype": "Currency",
+   "label": "Estimated Rate",
+   "options": "currency"
+  },
+  {
+   "fieldname": "estimated_amount",
+   "fieldtype": "Currency",
+   "label": "Estimated Amount",
+   "options": "currency"
+  },
+  {
+   "fieldname": "currency",
+   "fieldtype": "Link",
+   "label": "Currency",
+   "options": "Currency"
+  },
+  {
+   "fieldname": "procurement_source",
+   "fieldtype": "Data",
+   "label": "Procurement Source"
+  },
+  {
+   "fieldname": "procurement_constraint_summary",
+   "fieldtype": "Small Text",
+   "label": "Procurement Constraint Summary"
+  },
+  {
+   "fieldname": "first_shortage_date",
+   "fieldtype": "Date",
+   "label": "First Shortage Date"
+  },
+  {
+   "fieldname": "lowest_projected_qty",
+   "fieldtype": "Float",
+   "label": "Lowest Projected Qty"
+  },
+  {
+   "fieldname": "warning_count",
+   "fieldtype": "Int",
+   "label": "Warning Count"
+  },
+  {
+   "fieldname": "adjustment_summary",
+   "fieldtype": "Small Text",
+   "label": "Adjustment Summary"
+  },
+  {
+   "fieldname": "warning_summary",
+   "fieldtype": "Small Text",
+   "label": "Warning Summary"
+  },
+  {
+   "fieldname": "trace_section",
+   "fieldtype": "Section Break",
+   "label": "Trace"
+  },
+  {
+   "fieldname": "supply_trace",
+   "fieldtype": "Long Text",
+   "label": "Supply Trace"
+  },
+  {
+   "fieldname": "bom_trace",
+   "fieldtype": "Long Text",
+   "label": "BOM Trace"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Requirement Line",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "required_date",
+ "sort_order": "ASC",
+ "track_changes": 1
+}

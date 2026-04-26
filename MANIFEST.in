@@ -1,0 +1,12 @@
+include README.md
+recursive-include docs *.md
+recursive-include injection_mrp *.css
+recursive-include injection_mrp *.csv
+recursive-include injection_mrp *.html
+recursive-include injection_mrp *.js
+recursive-include injection_mrp *.json
+recursive-include injection_mrp *.md
+recursive-include injection_mrp *.py
+recursive-include injection_mrp *.svg
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]

@@ -1,0 +1,291 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "MRP-RBL-.#####",
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "mrp_run",
+  "company",
+  "item_code",
+  "item_name",
+  "warehouse",
+  "bucket_type",
+  "bucket_start",
+  "bucket_end",
+  "opening_qty",
+  "demand_qty",
+  "supply_qty",
+  "planned_supply_qty",
+  "projected_qty",
+  "safety_stock_qty",
+  "shortage_qty",
+  "safety_stock_gap_qty",
+  "warning_level",
+  "demand_trace",
+  "supply_trace"
+ ],
+ "fields": [
+  {
+   "fieldname": "mrp_run",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "MRP Run",
+   "options": "MRP Run",
+   "reqd": 1
+  },
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "bucket_type",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Bucket Type",
+   "options": "\nDaily\nWeekly"
+  },
+  {
+   "fieldname": "bucket_start",
+   "fieldtype": "Date",
+   "in_list_view": 1,
+   "label": "Bucket Start"
+  },
+  {
+   "fieldname": "bucket_end",
+   "fieldtype": "Date",
+   "label": "Bucket End"
+  },
+  {
+   "fieldname": "opening_qty",
+   "fieldtype": "Float",
+   "label": "Opening Qty"
+  },
+  {
+   "fieldname": "demand_qty",
+   "fieldtype": "Float",
+   "label": "Demand Qty"
+  },
+  {
+   "fieldname": "supply_qty",
+   "fieldtype": "Float",
+   "label": "Supply Qty"
+  },
+  {
+   "fieldname": "planned_supply_qty",
+   "fieldtype": "Float",
+   "label": "Planned Supply Qty"
+  },
+  {
+   "fieldname": "projected_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Projected Qty"
+  },
+  {
+   "fieldname": "safety_stock_qty",
+   "fieldtype": "Float",
+   "label": "Safety Stock Qty"
+  },
+  {
+   "fieldname": "shortage_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Shortage Qty"
+  },
+  {
+   "fieldname": "safety_stock_gap_qty",
+   "fieldtype": "Float",
+   "label": "Safety Stock Gap Qty"
+  },
+  {
+   "fieldname": "warning_level",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Warning Level",
+   "options": "\nNone\nInfo\nWarning\nCritical"
+  },
+  {
+   "fieldname": "demand_trace",
+   "fieldtype": "Long Text",
+   "label": "Demand Trace"
+  },
+  {
+   "fieldname": "supply_trace",
+   "fieldtype": "Long Text",
+   "label": "Supply Trace"
+  }
+ ],
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Rolling Balance Line",
+ "permissions": [
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "System Manager"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLM"
+  },
+  {
+   "read": 1,
+   "write": 1,
+   "create": 1,
+   "report": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "MPLP"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "GMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "PMC"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Purchase User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Manufacturing User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Stock User"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales Manager"
+  },
+  {
+   "read": 1,
+   "report": 1,
+   "export": 1,
+   "print": 1,
+   "email": 1,
+   "share": 1,
+   "select": 1,
+   "role": "Sales User"
+  }
+ ],
+ "sort_field": "bucket_start",
+ "sort_order": "ASC"
+}
