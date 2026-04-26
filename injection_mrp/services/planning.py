@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 import math
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import lru_cache
 from typing import Any
 
@@ -905,16 +905,16 @@ def _clear_run_outputs(mrp_run: str):
 
 def _collect_demands(run, settings) -> list[DemandRow]:
 	if run.run_type == "Firm APS":
-		return _collect_firm_aps_demands(run)
+		return _dedupe_demands(_filter_valid_demands(run, _collect_firm_aps_demands(run)))
 
 	demands = []
-	forecast_demands = _collect_customer_schedule_demands(run)
-	sales_order_demands = _collect_sales_order_demands(run)
+	forecast_demands = _filter_valid_demands(run, _collect_customer_schedule_demands(run))
+	sales_order_demands = _filter_valid_demands(run, _collect_sales_order_demands(run))
 	demands.extend(_consume_forecast_with_sales_orders(forecast_demands, sales_order_demands, settings))
 	demands.extend(sales_order_demands)
-	demands.extend(_collect_safety_stock_demands(run))
+	demands.extend(_filter_valid_demands(run, _collect_safety_stock_demands(run)))
 	if settings.include_production_plan_as_demand:
-		demands.extend(_collect_production_plan_demands(run))
+		demands.extend(_filter_valid_demands(run, _collect_production_plan_demands(run)))
 	return _dedupe_demands(demands)
 
 
@@ -1337,11 +1337,32 @@ def _insert_demand_snapshots(run, demands: list[DemandRow]) -> list[Any]:
 def _filter_valid_demands(run, demands: list[DemandRow]) -> list[DemandRow]:
 	valid_demands = []
 	for demand in demands:
-		if _item_exists(demand.item_code):
-			valid_demands.append(demand)
+		normalised_demand = _normalise_demand_item(demand)
+		if normalised_demand:
+			valid_demands.append(normalised_demand)
 			continue
 		_insert_invalid_demand_item_exception(run, demand)
 	return valid_demands
+
+
+def _normalise_demand_item(demand: DemandRow) -> DemandRow | None:
+	item_name = _resolve_item_name(demand.item_code)
+	if not item_name:
+		return None
+	if item_name == demand.item_code:
+		return demand
+	return replace(
+		demand,
+		item_code=item_name,
+		notes=_append_note(
+			demand.notes,
+			_("Source item value '{0}' was resolved to Item {1}.").format(demand.item_code, item_name),
+		),
+	)
+
+
+def _append_note(current: str | None, extra: str) -> str:
+	return "; ".join(part for part in (current, extra) if part)
 
 
 def _insert_invalid_demand_item_exception(run, demand: DemandRow):
@@ -3448,6 +3469,17 @@ def _item_exists(item_code) -> bool:
 
 
 @lru_cache(maxsize=10000)
+def _resolve_item_name(item_identifier) -> str | None:
+	if not item_identifier:
+		return None
+	if _item_exists(item_identifier):
+		return item_identifier
+	if _has_field("Item", "item_code"):
+		return frappe.db.get_value("Item", {"item_code": item_identifier}, "name")
+	return None
+
+
+@lru_cache(maxsize=10000)
 def _get_item_default_supplier(item_code):
 	if not _doctype_exists("Item Default") or not item_code:
 		return None
@@ -3855,6 +3887,7 @@ def _clear_planning_caches():
 		_first_field,
 		_get_item_values_cached,
 		_item_exists,
+		_resolve_item_name,
 		_get_item_default_supplier,
 		_get_item_supplier,
 		_get_default_bom,

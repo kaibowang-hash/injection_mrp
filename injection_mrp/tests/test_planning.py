@@ -267,10 +267,10 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertEqual(planning._get_excess_supply_action(run, supply), "Review Excess Prebuy")
 
 	def test_invalid_demand_item_is_filtered_to_exception(self):
-		original_item_exists = planning._item_exists
+		original_resolve_item_name = planning._resolve_item_name
 		original_insert_invalid = planning._insert_invalid_demand_item_exception
 		captured = []
-		planning._item_exists = lambda item_code: item_code == "VALID-ITEM"
+		planning._resolve_item_name = lambda item_code: item_code if item_code == "VALID-ITEM" else None
 		planning._insert_invalid_demand_item_exception = lambda run, demand: captured.append(demand.item_code)
 		try:
 			run = frappe._dict({"name": "MRP-RUN-TEST", "company": "Test Company"})
@@ -293,8 +293,46 @@ class TestPlanningHelpers(unittest.TestCase):
 
 			valid = planning._filter_valid_demands(run, demands)
 		finally:
-			planning._item_exists = original_item_exists
+			planning._resolve_item_name = original_resolve_item_name
 			planning._insert_invalid_demand_item_exception = original_insert_invalid
 
 		self.assertEqual([row.item_code for row in valid], ["VALID-ITEM"])
 		self.assertEqual(captured, ["PICO AD AIRPATH BODY RING"])
+
+	def test_demand_item_code_is_resolved_to_item_name(self):
+		original_resolve_item_name = planning._resolve_item_name
+		original_insert_invalid = planning._insert_invalid_demand_item_exception
+		captured = []
+		planning._resolve_item_name = lambda item_code: {
+			"ITEM-CODE-001": "ITEM-DOC-001",
+			"ITEM-DOC-002": "ITEM-DOC-002",
+		}.get(item_code)
+		planning._insert_invalid_demand_item_exception = lambda run, demand: captured.append(demand.item_code)
+		try:
+			run = frappe._dict({"name": "MRP-RUN-TEST", "company": "Test Company"})
+			demands = [
+				planning.DemandRow(
+					demand_type="Forecast",
+					item_code="ITEM-CODE-001",
+					qty=1,
+					required_date="2026-05-01",
+					company="Test Company",
+					notes="Original note",
+				),
+				planning.DemandRow(
+					demand_type="Forecast",
+					item_code="ITEM-DOC-002",
+					qty=1,
+					required_date="2026-05-01",
+					company="Test Company",
+				),
+			]
+
+			valid = planning._filter_valid_demands(run, demands)
+		finally:
+			planning._resolve_item_name = original_resolve_item_name
+			planning._insert_invalid_demand_item_exception = original_insert_invalid
+
+		self.assertEqual([row.item_code for row in valid], ["ITEM-DOC-001", "ITEM-DOC-002"])
+		self.assertIn("ITEM-CODE-001", valid[0].notes)
+		self.assertEqual(captured, [])
