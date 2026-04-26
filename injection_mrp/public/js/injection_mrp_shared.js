@@ -10,6 +10,9 @@ frappe.provide("injection_mrp.ui");
 		run_forecast_prebuy: ["System Manager", "MPLM", "MPLP"],
 		run_firm_aps_mrp: ["System Manager", "MPLM", "MPLP"],
 		recalculate_mrp_run: ["System Manager", "MPLM", "MPLP"],
+		enqueue_forecast_prebuy: ["System Manager", "MPLM", "MPLP"],
+		enqueue_firm_aps_mrp: ["System Manager", "MPLM", "MPLP"],
+		enqueue_recalculate_mrp_run: ["System Manager", "MPLM", "MPLP"],
 		apply_proposal_batch: ["System Manager", "MPLM", "MPLP"],
 		save_proposal_batch_items: ["System Manager", "MPLM", "MPLP"],
 	};
@@ -181,6 +184,8 @@ frappe.provide("injection_mrp.ui");
 		Draft: "DFT",
 		Ready: "RDY",
 		Pending: "PND",
+		Queued: "QUE",
+		Running: "RUN",
 		Applied: "APL",
 		Released: "REL",
 		Consumed: "CON",
@@ -190,6 +195,7 @@ frappe.provide("injection_mrp.ui");
 		Exception: "EXC",
 		Warning: "WRN",
 		Error: "ERR",
+		Failed: "FLD",
 		Cancelled: "CXL",
 		Rejected: "REJ",
 		Open: "OPN",
@@ -407,17 +413,80 @@ frappe.provide("injection_mrp.ui");
 		`;
 	};
 
+	injection_mrp.ui.code_legend_for_rows = function (rows, columns, options) {
+		options = options || {};
+		const legendColumns = options.legend_columns || [];
+		if (!legendColumns.length || !rows || !rows.length) {
+			return "";
+		}
+		const columnByField = {};
+		(columns || []).forEach((column) => {
+			if (column.fieldname) {
+				columnByField[column.fieldname] = column;
+			}
+		});
+		const entries = [];
+		const seen = new Set();
+		function add_entry(value, config) {
+			const text = String(value || "").trim();
+			if (!text) {
+				return;
+			}
+			const kind = config.kind || (columnByField[config.fieldname] || {}).legend_kind;
+			const code = injection_mrp.ui.short_code(text, kind);
+			const label = injection_mrp.ui.translate(text);
+			const tone = config.tone || injection_mrp.ui.code_tone(text, kind);
+			const key = `${code}::${label}`;
+			if (!code || seen.has(key)) {
+				return;
+			}
+			seen.add(key);
+			entries.push({ code, label, tone });
+		}
+		rows.forEach((row) => {
+			legendColumns.forEach((column) => {
+				const config = typeof column === "string" ? { fieldname: column } : column || {};
+				if (!config.fieldname) {
+					return;
+				}
+				const value = row[config.fieldname];
+				if (config.split !== false) {
+					injection_mrp.ui.split_badge_values(value).forEach((part) => add_entry(part, config));
+				} else {
+					add_entry(value, config);
+				}
+			});
+		});
+		if (!entries.length) {
+			return "";
+		}
+		return `
+			<div class="imrp-code-legend" aria-label="${injection_mrp.ui.escape(__("Code Legend"))}">
+				${entries
+					.map(
+						(item) => `
+						<span class="imrp-code-legend-item" data-imrp-tooltip="${injection_mrp.ui.escape(item.label)}">
+							<span class="imrp-code-badge ${injection_mrp.ui.escape(item.tone)}">${injection_mrp.ui.escape(item.code)}</span>
+							<span class="imrp-code-legend-equals">=</span>
+							<span class="imrp-code-legend-label">${injection_mrp.ui.escape(item.label)}</span>
+						</span>`
+					)
+					.join("")}
+			</div>
+		`;
+	};
+
 	injection_mrp.ui.status_tone = function (status) {
 		if (["Ready", "Applied", "Released", "Consumed", "Closed", "Calculated"].includes(status)) {
 			return "green";
 		}
-		if (["Draft", "Pending", "Proposal Generated"].includes(status)) {
+		if (["Draft", "Pending", "Proposal Generated", "Queued", "Running"].includes(status)) {
 			return "blue";
 		}
 		if (["Exception", "Warning"].includes(status)) {
 			return "orange";
 		}
-		if (["Error", "Cancelled", "Rejected"].includes(status)) {
+		if (["Error", "Failed", "Cancelled", "Rejected"].includes(status)) {
 			return "red";
 		}
 		return "blue";
@@ -544,7 +613,8 @@ frappe.provide("injection_mrp.ui");
 					${injection_mrp.ui.icon_button("right", __("Next Page"), { "data-imrp-page": "next", disabled: !pagination.has_next })}
 				</div>`
 			: "";
-		const render_toolbar = (legendHtml) =>
+		const legendHtml = options.show_code_legend === false ? "" : injection_mrp.ui.code_legend_for_rows(rows, columns, options);
+		const render_toolbar = () =>
 			options.exportable || options.show_count !== false || options.toolbar_html
 				? `
 				<div class="ia-table-toolbar">
@@ -554,10 +624,10 @@ frappe.provide("injection_mrp.ui");
 								? __("{0} rows").replace("{0}", injection_mrp.ui.format_number(pagination.total_count || (rows || []).length, 0))
 								: __("{0} rows").replace("{0}", injection_mrp.ui.format_number((rows || []).length, 0))
 						}</div>
-						${legendHtml || ""}
 					</div>
 					<div class="ia-table-actions">
 						${paginationHtml}
+						${legendHtml || ""}
 						${options.toolbar_html || ""}
 						${
 							options.exportable && rows && rows.length
@@ -569,7 +639,7 @@ frappe.provide("injection_mrp.ui");
 				: "";
 		if (!rows || !rows.length) {
 			target.html(`
-				${render_toolbar("")}
+				${render_toolbar()}
 				<div class="ia-table-empty">
 					<div class="ia-empty-title">${__("No rows found")}</div>
 					<div class="ia-muted">${injection_mrp.ui.escape(options.empty || __("Try changing the filters or refreshing the data."))}</div>
@@ -592,9 +662,8 @@ frappe.provide("injection_mrp.ui");
 				return `<tr data-name="${injection_mrp.ui.escape(row.name || "")}">${cells}</tr>`;
 			})
 			.join("");
-		const legend = options.show_code_legend === false ? "" : injection_mrp.ui.code_legend_html(body, options);
 		target.html(`
-			${render_toolbar(legend)}
+			${render_toolbar()}
 			<div class="ia-table-shell">
 				<table class="ia-table imrp-table"><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
 			</div>

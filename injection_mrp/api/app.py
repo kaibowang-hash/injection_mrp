@@ -50,6 +50,18 @@ def run_forecast_prebuy(company=None, item_code=None, customer=None, warehouse=N
 
 
 @frappe.whitelist()
+def enqueue_forecast_prebuy(company=None, item_code=None, customer=None, warehouse=None, planning_date=None):
+	_require_any_role(PLAN_ROLES)
+	return planning.enqueue_forecast_prebuy(
+		company=company,
+		item_code=item_code,
+		customer=customer,
+		warehouse=warehouse,
+		planning_date=planning_date,
+	)
+
+
+@frappe.whitelist()
 def run_firm_aps_mrp(company=None, aps_run=None, item_code=None, customer=None, warehouse=None, planning_date=None):
 	_require_any_role(PLAN_ROLES)
 	return planning.run_firm_aps_mrp(
@@ -63,9 +75,28 @@ def run_firm_aps_mrp(company=None, aps_run=None, item_code=None, customer=None, 
 
 
 @frappe.whitelist()
+def enqueue_firm_aps_mrp(company=None, aps_run=None, item_code=None, customer=None, warehouse=None, planning_date=None):
+	_require_any_role(PLAN_ROLES)
+	return planning.enqueue_firm_aps_mrp(
+		company=company,
+		aps_run=aps_run,
+		item_code=item_code,
+		customer=customer,
+		warehouse=warehouse,
+		planning_date=planning_date,
+	)
+
+
+@frappe.whitelist()
 def recalculate_mrp_run(mrp_run):
 	_require_any_role(PLAN_ROLES)
 	return planning.run_mrp(mrp_run=mrp_run)
+
+
+@frappe.whitelist()
+def enqueue_recalculate_mrp_run(mrp_run):
+	_require_any_role(PLAN_ROLES)
+	return planning.enqueue_recalculate_mrp_run(mrp_run)
 
 
 @frappe.whitelist()

@@ -290,6 +290,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 			exportable: true,
 			export_title: __("MRP Release Center"),
 			export_file_name: "mrp_release_batches",
+			legend_columns: [{ fieldname: "proposal_type" }, { fieldname: "status", kind: "status" }],
 			pagination: data.pagination,
 			on_page: (nextStart) => {
 				pageState.limit_start = nextStart;

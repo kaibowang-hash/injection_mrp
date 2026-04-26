@@ -336,3 +336,126 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertEqual([row.item_code for row in valid], ["ITEM-DOC-001", "ITEM-DOC-002"])
 		self.assertIn("ITEM-CODE-001", valid[0].notes)
 		self.assertEqual(captured, [])
+
+	def test_clear_run_outputs_uses_bulk_deletes_in_dependency_order(self):
+		original_doctype_exists = planning._doctype_exists
+		original_get_all = planning.frappe.get_all
+		original_sql = planning.frappe.db.sql
+		original_delete_doc = planning.frappe.delete_doc
+		sql_calls = []
+
+		planning._doctype_exists = lambda doctype: True
+		planning.frappe.get_all = lambda doctype, **kwargs: []
+
+		def fake_sql(query, values=None, **kwargs):
+			sql_calls.append((" ".join(query.split()), values))
+
+		def fake_delete_doc(*args, **kwargs):
+			raise AssertionError("MRP output cleanup must use bulk deletes, not delete_doc")
+
+		planning.frappe.db.sql = fake_sql
+		planning.frappe.delete_doc = fake_delete_doc
+		try:
+			planning._clear_run_outputs("MRP-RUN-TEST")
+		finally:
+			planning._doctype_exists = original_doctype_exists
+			planning.frappe.get_all = original_get_all
+			planning.frappe.db.sql = original_sql
+			planning.frappe.delete_doc = original_delete_doc
+
+		expected_doctypes = [
+			"MRP Proposal Batch",
+			"MRP Shortage Alert",
+			"MRP Rolling Balance Line",
+			"MRP Exception Log",
+			"MRP Pegging Line",
+			"MRP Requirement Line",
+			"MRP Demand Snapshot",
+		]
+		self.assertEqual(len(sql_calls), len(expected_doctypes) + 1)
+		self.assertIn("delete item from `tabMRP Proposal Item`", sql_calls[0][0])
+		self.assertEqual(sql_calls[0][1], ("MRP-RUN-TEST",))
+		for doctype, call in zip(expected_doctypes, sql_calls[1:]):
+			self.assertIn(f"delete from `tab{doctype}`", call[0])
+			self.assertEqual(call[1], ("MRP-RUN-TEST",))
+
+	def test_clear_run_outputs_rejects_applied_proposal_batch(self):
+		original_get_all = planning.frappe.get_all
+		planning.frappe.get_all = lambda doctype, **kwargs: ["MRP-PB-APPLIED"]
+		try:
+			with self.assertRaises(Exception):
+				planning._clear_run_outputs("MRP-RUN-TEST")
+		finally:
+			planning.frappe.get_all = original_get_all
+
+	def test_enqueue_forecast_prebuy_uses_long_queue_and_marks_queued_run(self):
+		original_create_mrp_run = planning.create_mrp_run
+		original_enqueue = planning.frappe.enqueue
+		original_get_value = planning.frappe.db.get_value
+		captured = {}
+
+		def fake_create_mrp_run(**kwargs):
+			captured["create"] = kwargs
+			return "MRP-RUN-QUEUE"
+
+		def fake_enqueue(method, **kwargs):
+			captured["enqueue_method"] = method
+			captured["enqueue"] = kwargs
+
+		planning.create_mrp_run = fake_create_mrp_run
+		planning.frappe.enqueue = fake_enqueue
+		planning.frappe.db.get_value = lambda doctype, name, fieldname: "Queued"
+		try:
+			result = planning.enqueue_forecast_prebuy(company="Test Company", item_code="FG-001")
+		finally:
+			planning.create_mrp_run = original_create_mrp_run
+			planning.frappe.enqueue = original_enqueue
+			planning.frappe.db.get_value = original_get_value
+
+		self.assertEqual(captured["create"]["run_type"], "Forecast Prebuy")
+		self.assertEqual(captured["create"]["status"], "Queued")
+		self.assertEqual(captured["enqueue_method"], "injection_mrp.services.planning.run_mrp")
+		self.assertEqual(captured["enqueue"]["queue"], planning.MRP_JOB_QUEUE)
+		self.assertEqual(captured["enqueue"]["timeout"], planning.MRP_JOB_TIMEOUT)
+		self.assertTrue(captured["enqueue"]["enqueue_after_commit"])
+		self.assertTrue(captured["enqueue"]["deduplicate"])
+		self.assertEqual(captured["enqueue"]["job_id"], "injection_mrp_run_MRP-RUN-QUEUE")
+		self.assertEqual(captured["enqueue"]["mrp_run"], "MRP-RUN-QUEUE")
+		self.assertEqual(result, {"mrp_run": "MRP-RUN-QUEUE", "job_id": "injection_mrp_run_MRP-RUN-QUEUE", "status": "Queued"})
+
+	def test_run_mrp_sets_failed_status_when_job_raises(self):
+		original_get_settings = planning.get_settings_dict
+		original_get_doc = planning.frappe.get_doc
+		original_ensure = planning._ensure_run_can_recalculate
+		original_prepare = planning._prepare_run_window
+		original_set_status = planning._set_run_execution_status
+		original_clear_outputs = planning._clear_run_outputs
+		original_rollback = planning.frappe.db.rollback
+		statuses = []
+		rollbacks = []
+		run = frappe._dict({"name": "MRP-RUN-FAIL"})
+		run.reload = lambda: None
+
+		planning.get_settings_dict = lambda: frappe._dict({})
+		planning.frappe.get_doc = lambda doctype, name: run
+		planning._ensure_run_can_recalculate = lambda mrp_run: None
+		planning._prepare_run_window = lambda run_doc, settings: None
+		planning._set_run_execution_status = lambda mrp_run, status, error_message=None: statuses.append((status, error_message))
+		planning._clear_run_outputs = lambda mrp_run: (_ for _ in ()).throw(RuntimeError("boom"))
+		planning.frappe.db.rollback = lambda: rollbacks.append(True)
+		try:
+			with self.assertRaises(RuntimeError):
+				planning.run_mrp(mrp_run="MRP-RUN-FAIL")
+		finally:
+			planning.get_settings_dict = original_get_settings
+			planning.frappe.get_doc = original_get_doc
+			planning._ensure_run_can_recalculate = original_ensure
+			planning._prepare_run_window = original_prepare
+			planning._set_run_execution_status = original_set_status
+			planning._clear_run_outputs = original_clear_outputs
+			planning.frappe.db.rollback = original_rollback
+
+		self.assertTrue(rollbacks)
+		self.assertEqual(statuses[0], ("Running", None))
+		self.assertEqual(statuses[-1][0], "Failed")
+		self.assertIn("boom", statuses[-1][1])

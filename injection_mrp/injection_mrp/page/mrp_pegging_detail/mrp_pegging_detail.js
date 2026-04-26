@@ -96,6 +96,13 @@ frappe.pages["mrp-pegging-detail"].on_page_load = function (wrapper) {
 			export_title: __("MRP Pegging Detail"),
 			export_file_name: "mrp_pegging_detail",
 			export_columns: columns.concat([{ label: __("Warning Reason"), fieldname: "warning_reason" }]),
+			legend_columns: [
+				{ fieldname: "run_type" },
+				{ fieldname: "warning_category", kind: "warning" },
+				{ fieldname: "warning_level", kind: "warning" },
+				{ fieldname: "supply_type" },
+				{ fieldname: "adjustment_action", kind: "action" },
+			],
 			pagination: data.pagination,
 			on_page: (nextStart) => {
 				pageState.limit_start = nextStart;

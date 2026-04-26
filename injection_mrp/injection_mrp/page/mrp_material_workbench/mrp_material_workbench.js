@@ -229,6 +229,14 @@ frappe.pages["mrp-material-workbench"].on_page_load = function (wrapper) {
 			export_title: __("MRP Material Workbench"),
 			export_file_name: "mrp_materials",
 			export_columns: columns.concat([{ label: __("Warning Count"), fieldname: "warning_count", numeric: true }]),
+			legend_columns: [
+				{ fieldname: "run_type" },
+				{ fieldname: "commitment_type" },
+				{ fieldname: "status", kind: "status" },
+				{ fieldname: "supply_mode" },
+				{ fieldname: "material_request_type" },
+				{ fieldname: "warning_summary", kind: "warning" },
+			],
 			pagination: data.pagination,
 			on_page: (nextStart) => {
 				pageState.limit_start = nextStart;

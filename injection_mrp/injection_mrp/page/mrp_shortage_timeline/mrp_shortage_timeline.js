@@ -100,6 +100,7 @@ frappe.pages["mrp-shortage-timeline"].on_page_load = function (wrapper) {
 			export_title: __("MRP Shortage Timeline"),
 			export_file_name: "mrp_shortage_timeline",
 			toolbar_html: ui.icon_button("download", __("Export Rolling Balance"), { "data-imrp-export-balance": "1" }),
+			legend_columns: [{ fieldname: "warning_level", kind: "warning" }, { fieldname: "status", kind: "status" }],
 			pagination: data.pagination,
 			on_page: (nextStart) => {
 				pageState.limit_start = nextStart;

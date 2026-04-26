@@ -27,6 +27,7 @@
   "total_proposed_qty",
   "proposal_batch",
   "source_summary",
+  "error_message",
   "notes"
  ],
  "fields": [
@@ -53,7 +54,7 @@
    "fieldtype": "Select",
    "in_list_view": 1,
    "label": "Status",
-   "options": "\nDraft\nCalculated\nProposal Generated\nReleased\nClosed\nCancelled",
+   "options": "\nDraft\nQueued\nRunning\nCalculated\nProposal Generated\nReleased\nFailed\nClosed\nCancelled",
    "read_only": 1
   },
   {
@@ -163,6 +164,12 @@
    "fieldname": "source_summary",
    "fieldtype": "Small Text",
    "label": "Source Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "error_message",
+   "fieldtype": "Long Text",
+   "label": "Last Error",
    "read_only": 1
   },
   {

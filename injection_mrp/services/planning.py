@@ -28,6 +28,9 @@ MR_TYPE_BY_SUPPLY_MODE = {
 	"Customer Provided": "Customer Provided",
 	"Material Transfer": "Material Transfer",
 }
+MRP_JOB_QUEUE = "long"
+MRP_JOB_TIMEOUT = 3600
+MRP_ACTIVE_STATUSES = {"Queued", "Running"}
 
 
 @dataclass
@@ -135,6 +138,7 @@ def create_mrp_run(
 	customer: str | None = None,
 	warehouse: str | None = None,
 	planning_date: str | None = None,
+	status: str = "Draft",
 ) -> str:
 	settings = get_settings_dict()
 	run_type = run_type or "Forecast Prebuy"
@@ -151,7 +155,7 @@ def create_mrp_run(
 			"doctype": "MRP Run",
 			"company": company,
 			"run_type": run_type,
-			"status": "Draft",
+			"status": status,
 			"planning_date": planning_date,
 			"horizon_days": horizon_days,
 			"horizon_start": planning_date,
@@ -177,6 +181,7 @@ def run_mrp(
 	planning_date: str | None = None,
 ) -> dict[str, Any]:
 	_clear_planning_caches()
+	created_run = False
 	if not mrp_run:
 		mrp_run = create_mrp_run(
 			run_type=run_type,
@@ -187,42 +192,57 @@ def run_mrp(
 			warehouse=warehouse,
 			planning_date=planning_date,
 		)
+		created_run = True
 
 	settings = get_settings_dict()
 	run = frappe.get_doc("MRP Run", mrp_run)
-	_prepare_run_window(run, settings)
-	_clear_run_outputs(run.name)
+	_ensure_run_can_recalculate(run.name)
 
-	demands = _collect_demands(run, settings)
-	snapshots = _insert_demand_snapshots(run, demands)
-	candidates = _explode_demand_snapshots(run, snapshots)
-	requirements = _net_requirements(run, settings, candidates)
-	batch = _create_proposal_batch(run, settings, requirements)
-	rolling_summary = _calculate_rolling_availability(run, settings, requirements, batch)
-	_create_excess_prebuy_exceptions(run, requirements)
+	try:
+		_prepare_run_window(run, settings)
+		_set_run_execution_status(run.name, "Running")
+		run.reload()
+		_clear_run_outputs(run.name)
 
-	run.reload()
-	run.status = "Proposal Generated" if batch else "Calculated"
-	run.demand_count = len(snapshots)
-	run.requirement_count = len(requirements)
-	run.exception_count = frappe.db.count("MRP Exception Log", {"mrp_run": run.name})
-	run.total_gross_qty = sum(flt(row.gross_qty) for row in requirements)
-	run.total_net_qty = sum(flt(row.net_qty) for row in requirements)
-	run.total_proposed_qty = sum(flt(row.net_qty) + flt(row.prebuy_consumed_qty) for row in requirements)
-	run.proposal_batch = batch.name if batch else ""
-	run.source_summary = _build_source_summary(demands)
-	run.save(ignore_permissions=True)
+		demands = _collect_demands(run, settings)
+		snapshots = _insert_demand_snapshots(run, demands)
+		candidates = _explode_demand_snapshots(run, snapshots)
+		requirements = _net_requirements(run, settings, candidates)
+		batch = _create_proposal_batch(run, settings, requirements)
+		rolling_summary = _calculate_rolling_availability(run, settings, requirements, batch)
+		_create_excess_prebuy_exceptions(run, requirements)
 
-	frappe.db.commit()
-	return {
-		"mrp_run": run.name,
-		"proposal_batch": batch.name if batch else None,
-		"demand_count": len(snapshots),
-		"requirement_count": len(requirements),
-		"exception_count": run.exception_count,
-		"total_net_qty": run.total_net_qty,
-		"shortage_alert_count": rolling_summary.get("shortage_alert_count", 0),
-	}
+		run.reload()
+		run.status = "Proposal Generated" if batch else "Calculated"
+		if run.meta.has_field("error_message"):
+			run.error_message = ""
+		run.demand_count = len(snapshots)
+		run.requirement_count = len(requirements)
+		run.exception_count = frappe.db.count("MRP Exception Log", {"mrp_run": run.name})
+		run.total_gross_qty = sum(flt(row.gross_qty) for row in requirements)
+		run.total_net_qty = sum(flt(row.net_qty) for row in requirements)
+		run.total_proposed_qty = sum(flt(row.net_qty) + flt(row.prebuy_consumed_qty) for row in requirements)
+		run.proposal_batch = batch.name if batch else ""
+		run.source_summary = _build_source_summary(demands)
+		run.save(ignore_permissions=True)
+
+		frappe.db.commit()
+		return {
+			"mrp_run": run.name,
+			"proposal_batch": batch.name if batch else None,
+			"demand_count": len(snapshots),
+			"requirement_count": len(requirements),
+			"exception_count": run.exception_count,
+			"total_net_qty": run.total_net_qty,
+			"shortage_alert_count": rolling_summary.get("shortage_alert_count", 0),
+		}
+	except Exception as exc:
+		frappe.db.rollback()
+		if mrp_run:
+			_set_run_execution_status(mrp_run, "Failed", _format_run_error(exc))
+		if created_run:
+			frappe.log_error(frappe.get_traceback(), _("MRP Run failed"))
+		raise
 
 
 def run_forecast_prebuy(**kwargs):
@@ -233,6 +253,59 @@ def run_forecast_prebuy(**kwargs):
 def run_firm_aps_mrp(**kwargs):
 	kwargs["run_type"] = "Firm APS"
 	return run_mrp(**kwargs)
+
+
+def enqueue_forecast_prebuy(**kwargs):
+	kwargs["run_type"] = "Forecast Prebuy"
+	return enqueue_mrp_run(**kwargs)
+
+
+def enqueue_firm_aps_mrp(**kwargs):
+	kwargs["run_type"] = "Firm APS"
+	return enqueue_mrp_run(**kwargs)
+
+
+def enqueue_recalculate_mrp_run(mrp_run: str):
+	return enqueue_mrp_run(mrp_run=mrp_run)
+
+
+def enqueue_mrp_run(
+	mrp_run: str | None = None,
+	run_type: str = "Forecast Prebuy",
+	company: str | None = None,
+	aps_run: str | None = None,
+	item_code: str | None = None,
+	customer: str | None = None,
+	warehouse: str | None = None,
+	planning_date: str | None = None,
+) -> dict[str, Any]:
+	if mrp_run:
+		run = frappe.get_doc("MRP Run", mrp_run)
+		_ensure_run_can_recalculate(run.name)
+		if run.status not in MRP_ACTIVE_STATUSES:
+			_set_run_execution_status(run.name, "Queued", "")
+	else:
+		mrp_run = create_mrp_run(
+			run_type=run_type,
+			company=company,
+			aps_run=aps_run,
+			item_code=item_code,
+			customer=customer,
+			warehouse=warehouse,
+			planning_date=planning_date,
+			status="Queued",
+		)
+	job_id = _mrp_job_id(mrp_run)
+	frappe.enqueue(
+		"injection_mrp.services.planning.run_mrp",
+		queue=MRP_JOB_QUEUE,
+		timeout=MRP_JOB_TIMEOUT,
+		enqueue_after_commit=True,
+		deduplicate=True,
+		job_id=job_id,
+		mrp_run=mrp_run,
+	)
+	return {"mrp_run": mrp_run, "job_id": job_id, "status": frappe.db.get_value("MRP Run", mrp_run, "status")}
 
 
 def apply_proposal_batch(batch_name: str) -> dict[str, Any]:
@@ -337,23 +410,26 @@ def save_proposal_batch_items(batch_name: str, items: list[dict[str, Any]] | str
 
 
 def get_run_console_data(limit: int = 20) -> dict[str, Any]:
+	fields = [
+		"name",
+		"company",
+		"run_type",
+		"status",
+		"planning_date",
+		"horizon_end",
+		"aps_run",
+		"demand_count",
+		"requirement_count",
+		"exception_count",
+		"total_net_qty",
+		"proposal_batch",
+		"modified",
+	]
+	if _has_field("MRP Run", "error_message"):
+		fields.append("error_message")
 	runs = frappe.get_all(
 		"MRP Run",
-		fields=[
-			"name",
-			"company",
-			"run_type",
-			"status",
-			"planning_date",
-			"horizon_end",
-			"aps_run",
-			"demand_count",
-			"requirement_count",
-			"exception_count",
-			"total_net_qty",
-			"proposal_batch",
-			"modified",
-		],
+		fields=fields,
 		order_by="modified desc",
 		limit_page_length=cint(limit) or 20,
 	)
@@ -361,8 +437,8 @@ def get_run_console_data(limit: int = 20) -> dict[str, Any]:
 		"cards": _summary_cards(),
 		"runs": runs,
 		"actions": [
-			{"label": _("Run Forecast Prebuy"), "action_key": "run_forecast_prebuy", "tone": "primary"},
-			{"label": _("Run Firm APS"), "action_key": "run_firm_aps_mrp", "tone": "primary"},
+			{"label": _("Run Forecast Prebuy"), "action_key": "enqueue_forecast_prebuy", "tone": "primary"},
+			{"label": _("Run Firm APS"), "action_key": "enqueue_firm_aps_mrp", "tone": "primary"},
 		],
 	}
 
@@ -771,6 +847,33 @@ def _lock_proposal_batch(batch_name: str):
 	return frappe.get_doc("MRP Proposal Batch", batch_name)
 
 
+def _ensure_run_can_recalculate(mrp_run: str):
+	applied_batches = frappe.get_all(
+		"MRP Proposal Batch", filters={"mrp_run": mrp_run, "status": "Applied"}, pluck="name"
+	)
+	if applied_batches:
+		frappe.throw(_("MRP Run {0} already has applied proposal batches and cannot be recalculated.").format(mrp_run))
+
+
+def _set_run_execution_status(mrp_run: str, status: str, error_message: str | None = None):
+	if not mrp_run or not frappe.db.exists("MRP Run", mrp_run):
+		return
+	values = {"status": status}
+	if _has_field("MRP Run", "error_message"):
+		values["error_message"] = error_message or ""
+	frappe.db.set_value("MRP Run", mrp_run, values)
+	frappe.db.commit()
+
+
+def _format_run_error(exc: Exception) -> str:
+	message = str(exc) or exc.__class__.__name__
+	return message[:2000]
+
+
+def _mrp_job_id(mrp_run: str) -> str:
+	return f"injection_mrp_run_{mrp_run}"
+
+
 def _pagination_args(limit_start: int | str | None, limit_page_length: int | str | None, default_length: int):
 	start = max(cint(limit_start), 0)
 	page_length = cint(limit_page_length) or default_length
@@ -881,15 +984,10 @@ def _prepare_run_window(run, settings):
 
 
 def _clear_run_outputs(mrp_run: str):
-	applied_batches = frappe.get_all(
-		"MRP Proposal Batch", filters={"mrp_run": mrp_run, "status": "Applied"}, pluck="name"
-	)
-	if applied_batches:
-		frappe.throw(_("MRP Run {0} already has applied proposal batches and cannot be recalculated.").format(mrp_run))
-
-	for batch_name in frappe.get_all("MRP Proposal Batch", filters={"mrp_run": mrp_run}, pluck="name"):
-		frappe.delete_doc("MRP Proposal Batch", batch_name, force=1, ignore_permissions=True)
+	_ensure_run_can_recalculate(mrp_run)
+	_delete_proposal_items_for_run(mrp_run)
 	for doctype in (
+		"MRP Proposal Batch",
 		"MRP Shortage Alert",
 		"MRP Rolling Balance Line",
 		"MRP Exception Log",
@@ -897,10 +995,27 @@ def _clear_run_outputs(mrp_run: str):
 		"MRP Requirement Line",
 		"MRP Demand Snapshot",
 	):
-		if not _doctype_exists(doctype):
-			continue
-		for name in frappe.get_all(doctype, filters={"mrp_run": mrp_run}, pluck="name"):
-			frappe.delete_doc(doctype, name, force=1, ignore_permissions=True)
+		_delete_mrp_run_rows(doctype, mrp_run)
+
+
+def _delete_proposal_items_for_run(mrp_run: str):
+	if not _doctype_exists("MRP Proposal Item") or not _doctype_exists("MRP Proposal Batch"):
+		return
+	frappe.db.sql(
+		"""
+		delete item
+		from `tabMRP Proposal Item` item
+		inner join `tabMRP Proposal Batch` batch on batch.name = item.parent
+		where batch.mrp_run = %s
+		""",
+		(mrp_run,),
+	)
+
+
+def _delete_mrp_run_rows(doctype: str, mrp_run: str):
+	if not _doctype_exists(doctype):
+		return
+	frappe.db.sql(f"delete from `tab{doctype}` where mrp_run = %s", (mrp_run,))
 
 
 def _collect_demands(run, settings) -> list[DemandRow]:

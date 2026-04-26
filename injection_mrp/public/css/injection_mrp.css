@@ -95,10 +95,11 @@
 .imrp-code-legend {
 	display: flex;
 	align-items: center;
+	justify-content: flex-end;
+	flex-wrap: wrap;
 	gap: 4px 8px;
 	min-width: 0;
-	overflow: hidden;
-	white-space: nowrap;
+	max-width: min(720px, 60vw);
 	color: #64748b;
 	font-size: 10px;
 }
@@ -116,10 +117,12 @@
 	cursor: inherit;
 }
 
+.imrp-code-legend-equals {
+	color: #94a3b8;
+}
+
 .imrp-code-legend-label {
 	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 

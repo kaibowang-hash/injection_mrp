@@ -38,6 +38,7 @@ frappe.pages["mrp-demand-console"].on_page_load = function (wrapper) {
 			exportable: true,
 			export_title: __("MRP Demand Console"),
 			export_file_name: "mrp_demand",
+			legend_columns: [{ fieldname: "demand_type" }, { fieldname: "status", kind: "status" }],
 			pagination: data.pagination,
 			on_page: (nextStart) => {
 				pageState.limit_start = nextStart;
