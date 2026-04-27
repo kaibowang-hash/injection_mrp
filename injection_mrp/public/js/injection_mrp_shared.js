@@ -638,20 +638,20 @@ frappe.provide("injection_mrp.ui");
 		const render_toolbar = () =>
 			options.exportable || options.show_count !== false || options.toolbar_html
 				? `
-				<div class="ia-table-toolbar">
-					<div class="imrp-table-meta">
-						<div class="ia-table-count">${
-							options.pagination
-								? __("{0} rows").replace("{0}", injection_mrp.ui.format_number(pagination.total_count || (rows || []).length, 0))
-								: __("{0} rows").replace("{0}", injection_mrp.ui.format_number((rows || []).length, 0))
-						}</div>
-					</div>
-					<div class="ia-table-actions">
-						${paginationHtml}
-						${legendHtml || ""}
-						${options.toolbar_html || ""}
-						${
-							options.exportable && rows && rows.length
+					<div class="ia-table-toolbar imrp-table-toolbar">
+						<div class="imrp-table-meta">
+							<div class="ia-table-count">${
+								options.pagination
+									? __("{0} rows").replace("{0}", injection_mrp.ui.format_number(pagination.total_count || (rows || []).length, 0))
+									: __("{0} rows").replace("{0}", injection_mrp.ui.format_number((rows || []).length, 0))
+							}</div>
+							${legendHtml || ""}
+						</div>
+						<div class="ia-table-actions imrp-table-actions">
+							${paginationHtml}
+							${options.toolbar_html || ""}
+							${
+								options.exportable && rows && rows.length
 								? injection_mrp.ui.icon_button("download", __("Export Excel"), { "data-imrp-export-table": "1" })
 								: ""
 						}

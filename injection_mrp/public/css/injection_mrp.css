@@ -41,6 +41,14 @@
 	flex-wrap: wrap;
 }
 
+.ia-table-toolbar.imrp-table-toolbar {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) max-content;
+	align-items: flex-start;
+	gap: 6px 12px;
+	width: 100%;
+}
+
 .ia-table-actions {
 	display: flex;
 	align-items: flex-start;
@@ -49,6 +57,14 @@
 	min-width: min(280px, 100%);
 	flex: 1 1 520px;
 	flex-wrap: wrap;
+}
+
+.ia-table-actions.imrp-table-actions {
+	min-width: 0;
+	max-width: 100%;
+	flex: none;
+	justify-content: flex-end;
+	justify-self: end;
 }
 
 .imrp-table tbody tr {
@@ -62,10 +78,12 @@
 
 .imrp-table-meta {
 	display: flex;
-	align-items: center;
-	gap: 10px;
+	align-items: flex-start;
+	gap: 6px 10px;
 	min-width: 0;
 	flex: 1 1 auto;
+	flex-wrap: wrap;
+	justify-content: flex-start;
 }
 
 .imrp-pagination {
@@ -342,6 +360,14 @@
 }
 
 @media (max-width: 768px) {
+	.ia-table-toolbar.imrp-table-toolbar {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	.ia-table-actions.imrp-table-actions {
+		width: 100%;
+	}
+
 	.imrp-filters .form-group,
 	.imrp-filter.form-group {
 		min-width: 100%;
