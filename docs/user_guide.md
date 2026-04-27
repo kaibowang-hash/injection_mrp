@@ -40,6 +40,9 @@ MRP 不以 ERPNext 原生 `Production Plan` 作为主流程，也不会弃用它
 | `Include Production Plan As Supply` | 勾选 | 保留生产计划相关供应抵扣 |
 | `Include Production Plan As Demand` | 不勾选 | 默认不把生产计划作为需求来源 |
 | `Default Material Request Type` | Purchase | 默认生成采购类 Material Request |
+| `Warehouse Defaults by Supply Mode` | 空 | 按供应方式维护默认目标仓/来源仓；例如采购物料默认进原材料仓，调拨物料默认从指定来源仓转入指定目标仓 |
+| `Default Source Warehouse` | 空 | 旧版全局来源仓，主要作为 Material Transfer 兜底 |
+| `Default Target Warehouse` | 空 | 旧版全局目标仓，仅在供应规则、供应方式默认仓、需求仓和 Item 默认仓都没有时兜底 |
 | `Rolling Daily Horizon Days` | 60 | 滚动余额近多少天按日显示，之后按周汇总 |
 
 ### MRP Supply Rule
@@ -54,6 +57,13 @@ MRP 不以 ERPNext 原生 `Production Plan` 作为主流程，也不会弃用它
 4. 是否存在默认 BOM。
 5. 是否采购物料。
 6. MRP Settings 默认 Material Request Type。
+
+仓库取值优先级：
+
+1. `MRP Supply Rule` 明确指定的 `Source Warehouse` / `Target Warehouse`。
+2. `MRP Settings > Warehouse Defaults by Supply Mode` 中对应供应方式的默认仓库。
+3. 需求来源、MRP Run 或 Item 默认仓库。
+4. 旧版全局 `Default Source Warehouse` / `Default Target Warehouse` 兜底。
 
 支持的供应方式：
 

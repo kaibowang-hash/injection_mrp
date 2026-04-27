@@ -1,0 +1,50 @@
+{
+ "actions": [],
+ "creation": "2026-04-27 00:00:00.000000",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "supply_mode",
+  "target_warehouse",
+  "source_warehouse",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "supply_mode",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Supply Mode",
+   "options": "\nPurchase\nManufacture\nSubcontracting\nCustomer Provided\nMaterial Transfer\nSupplier Supplied\nNo Action",
+   "reqd": 1
+  },
+  {
+   "fieldname": "target_warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Target Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "source_warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Source Warehouse",
+   "options": "Warehouse"
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "istable": 1,
+ "links": [],
+ "modified": "2026-04-27 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Warehouse Default",
+ "permissions": [],
+ "sort_field": "modified",
+ "sort_order": "DESC"
+}

@@ -108,6 +108,21 @@ class SupplyRecord:
 	commitment_type: str | None = None
 
 
+def _warehouse_defaults_from_rows(rows) -> frappe._dict:
+	defaults = frappe._dict()
+	for row in rows or []:
+		supply_mode = (row.get("supply_mode") if hasattr(row, "get") else None) or getattr(row, "supply_mode", None)
+		if not supply_mode or supply_mode in defaults:
+			continue
+		defaults[supply_mode] = frappe._dict(
+			{
+				"source_warehouse": (row.get("source_warehouse") if hasattr(row, "get") else None) or getattr(row, "source_warehouse", None),
+				"target_warehouse": (row.get("target_warehouse") if hasattr(row, "get") else None) or getattr(row, "target_warehouse", None),
+			}
+		)
+	return defaults
+
+
 def get_settings_dict() -> frappe._dict:
 	settings = frappe.get_single("MRP Settings")
 	return frappe._dict(
@@ -129,6 +144,7 @@ def get_settings_dict() -> frappe._dict:
 			"include_production_plan_as_demand": cint(settings.include_production_plan_as_demand),
 			"auto_submit_material_request": cint(settings.auto_submit_material_request),
 			"default_material_request_type": settings.default_material_request_type or "Purchase",
+			"warehouse_defaults": _warehouse_defaults_from_rows(settings.get("warehouse_defaults")),
 			"default_source_warehouse": settings.default_source_warehouse,
 			"default_target_warehouse": settings.default_target_warehouse,
 		}
@@ -2211,15 +2227,15 @@ def _candidate_from_item(
 	missing_bom: bool = False,
 ):
 	item = _get_item_values(item_code)
-	warehouse = snapshot.warehouse or item.get("default_warehouse")
-	route = route or _resolve_supply_route(item_code, run.company, snapshot.customer, warehouse, settings)
+	requested_warehouse = snapshot.warehouse or item.get("default_warehouse")
+	route = route or _resolve_supply_route(item_code, run.company, snapshot.customer, requested_warehouse, settings)
 	return RequirementCandidate(
 		demand_snapshot=snapshot.name,
 		demand_item_code=snapshot.item_code,
 		item_code=item_code,
 		item_name=item.get("item_name"),
 		uom=item.get("stock_uom"),
-		warehouse=route.get("target_warehouse") or warehouse,
+		warehouse=route.get("target_warehouse") or requested_warehouse or settings.default_target_warehouse,
 		required_date=required_date or snapshot.required_date,
 		gross_qty=flt(qty),
 		scrap_qty=0,
@@ -2341,12 +2357,13 @@ def _find_supply_rule(item_code, item_group, company, customer, warehouse):
 
 def _route_from_rule(rule, settings, item, customer=None):
 	supply_mode = rule.supply_mode or _supply_mode_from_mr_type(rule.material_request_type or settings.default_material_request_type)
+	warehouse_defaults = _get_supply_mode_warehouse_defaults(settings, supply_mode)
 	return frappe._dict(
 		{
 			"supply_mode": supply_mode,
 			"material_request_type": rule.material_request_type or _mr_type_from_supply_mode(supply_mode, settings),
-			"source_warehouse": rule.source_warehouse,
-			"target_warehouse": rule.target_warehouse,
+			"source_warehouse": rule.source_warehouse or warehouse_defaults.source_warehouse or (settings.default_source_warehouse if supply_mode == "Material Transfer" else None),
+			"target_warehouse": rule.target_warehouse or warehouse_defaults.target_warehouse,
 			"supplier": rule.supplier,
 			"customer": customer or item.get("customer"),
 			"sourced_by_supplier": 1 if supply_mode == "Supplier Supplied" else 0,
@@ -2359,14 +2376,26 @@ def _route_from_rule(rule, settings, item, customer=None):
 	)
 
 
+def _get_supply_mode_warehouse_defaults(settings, supply_mode) -> frappe._dict:
+	defaults = (settings or {}).get("warehouse_defaults") if hasattr(settings, "get") else None
+	row = (defaults or {}).get(supply_mode) if hasattr(defaults, "get") else None
+	return frappe._dict(
+		{
+			"source_warehouse": (row or {}).get("source_warehouse") if hasattr(row, "get") else None,
+			"target_warehouse": (row or {}).get("target_warehouse") if hasattr(row, "get") else None,
+		}
+	)
+
+
 def _route_dict(supply_mode, settings, item=None, customer=None, sourced_by_supplier=0):
 	item = item or {}
+	warehouse_defaults = _get_supply_mode_warehouse_defaults(settings, supply_mode)
 	return frappe._dict(
 		{
 			"supply_mode": supply_mode,
 			"material_request_type": _mr_type_from_supply_mode(supply_mode, settings),
-			"source_warehouse": settings.default_source_warehouse if supply_mode == "Material Transfer" else None,
-			"target_warehouse": settings.default_target_warehouse,
+			"source_warehouse": warehouse_defaults.source_warehouse or (settings.default_source_warehouse if supply_mode == "Material Transfer" else None),
+			"target_warehouse": warehouse_defaults.target_warehouse,
 			"supplier": item.get("default_supplier"),
 			"customer": customer,
 			"sourced_by_supplier": sourced_by_supplier,

@@ -26,6 +26,7 @@
   "auto_submit_material_request",
   "defaults_section",
   "default_material_request_type",
+  "warehouse_defaults",
   "default_source_warehouse",
   "default_target_warehouse"
  ],
@@ -152,6 +153,12 @@
    "fieldtype": "Select",
    "label": "Default Material Request Type",
    "options": "\nPurchase\nMaterial Transfer\nMaterial Issue\nManufacture\nSubcontracting\nCustomer Provided"
+  },
+  {
+   "fieldname": "warehouse_defaults",
+   "fieldtype": "Table",
+   "label": "Warehouse Defaults by Supply Mode",
+   "options": "MRP Warehouse Default"
   },
   {
    "fieldname": "default_source_warehouse",

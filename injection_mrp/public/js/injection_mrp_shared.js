@@ -283,6 +283,29 @@ frappe.provide("injection_mrp.ui");
 		return words.map((word) => word[0]).join("").slice(0, 4).toUpperCase();
 	};
 
+	injection_mrp.ui.code_meta = function (value, kind, options) {
+		options = options || {};
+		const text = String(value || "").trim();
+		if (!text) {
+			return null;
+		}
+		let code = options.code;
+		let labelSource = options.label || text;
+		let toneSource = text;
+		if (kind === "warning") {
+			const matched = injection_mrp.ui.__warning_patterns.find(([pattern]) => pattern.test(text));
+			if (matched) {
+				code = code || matched[1];
+				labelSource = options.label || matched[2];
+				toneSource = matched[2];
+			}
+		}
+		code = code || injection_mrp.ui.short_code(text, kind);
+		const label = injection_mrp.ui.translate(labelSource);
+		const tone = options.tone || injection_mrp.ui.code_tone(toneSource, kind);
+		return { code, label, tone, labelSource, source: text };
+	};
+
 	injection_mrp.ui.code_tone = function (value, kind) {
 		const text = String(value || "");
 		if (kind === "warning") {
@@ -317,10 +340,11 @@ frappe.provide("injection_mrp.ui");
 		if (value == null || value === "") {
 			return options.empty ? injection_mrp.ui.code_badge(options.empty, options) : "";
 		}
-		const label = options.label || injection_mrp.ui.translate(value);
+		const meta = injection_mrp.ui.code_meta(value, options.kind, options) || {};
+		const label = options.label || meta.label || injection_mrp.ui.translate(value);
 		const title = options.title || label;
-		const code = options.code || injection_mrp.ui.short_code(value, options.kind);
-		const tone = options.tone || injection_mrp.ui.code_tone(value, options.kind);
+		const code = meta.code || options.code || injection_mrp.ui.short_code(value, options.kind);
+		const tone = meta.tone || options.tone || injection_mrp.ui.code_tone(value, options.kind);
 		return `<span class="imrp-code-badge ${injection_mrp.ui.escape(tone)}" data-imrp-code="${injection_mrp.ui.escape(code)}" data-imrp-label="${injection_mrp.ui.escape(label)}" data-imrp-tooltip="${injection_mrp.ui.escape(title)}">${injection_mrp.ui.escape(code)}</span>`;
 	};
 
@@ -387,7 +411,7 @@ frappe.provide("injection_mrp.ui");
 			if (!code || !label) {
 				return;
 			}
-			const key = `${code}::${label}`;
+			const key = code;
 			if (seen.has(key)) {
 				return;
 			}
@@ -397,21 +421,18 @@ frappe.provide("injection_mrp.ui");
 		if (!entries.length) {
 			return "";
 		}
-		const max = options.max_legend_items || 16;
-		const visible = entries.slice(0, max);
-		const extra = entries.length - visible.length;
 		return `
 			<div class="imrp-code-legend" aria-label="${injection_mrp.ui.escape(__("Code Legend"))}">
-				${visible
+				${entries
 					.map(
 						(item) => `
-						<span class="imrp-code-legend-item" data-imrp-tooltip="${injection_mrp.ui.escape(item.tooltip)}">
-							<span class="imrp-code-badge ${injection_mrp.ui.escape(item.tone)}">${injection_mrp.ui.escape(item.code)}</span>
-							<span class="imrp-code-legend-label">${injection_mrp.ui.escape(item.label)}</span>
-						</span>`
+							<span class="imrp-code-legend-item" data-imrp-tooltip="${injection_mrp.ui.escape(item.tooltip)}">
+								<span class="imrp-code-badge ${injection_mrp.ui.escape(item.tone)}">${injection_mrp.ui.escape(item.code)}</span>
+								<span class="imrp-code-legend-equals">=</span>
+								<span class="imrp-code-legend-label">${injection_mrp.ui.escape(item.label)}</span>
+							</span>`
 					)
 					.join("")}
-				${extra > 0 ? `<span class="imrp-code-legend-more" data-imrp-tooltip="${injection_mrp.ui.escape(entries.slice(max).map((item) => `${item.code} = ${item.label}`).join("; "))}">+${injection_mrp.ui.format_number(extra, 0)}</span>` : ""}
 			</div>
 		`;
 	};
@@ -436,15 +457,12 @@ frappe.provide("injection_mrp.ui");
 				return;
 			}
 			const kind = config.kind || (columnByField[config.fieldname] || {}).legend_kind;
-			const code = injection_mrp.ui.short_code(text, kind);
-			const label = injection_mrp.ui.translate(text);
-			const tone = config.tone || injection_mrp.ui.code_tone(text, kind);
-			const key = `${code}::${label}`;
-			if (!code || seen.has(key)) {
+			const meta = injection_mrp.ui.code_meta(text, kind, config);
+			if (!meta || !meta.code || seen.has(meta.code)) {
 				return;
 			}
-			seen.add(key);
-			entries.push({ code, label, tone });
+			seen.add(meta.code);
+			entries.push({ code: meta.code, label: meta.label, tone: meta.tone });
 		}
 		rows.forEach((row) => {
 			legendColumns.forEach((column) => {

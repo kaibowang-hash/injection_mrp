@@ -105,6 +105,80 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertEqual(planning._mr_type_from_supply_mode("Customer Provided", settings), "Customer Provided")
 		self.assertEqual(planning._mr_type_from_supply_mode("Supplier Supplied", settings), "Purchase")
 
+	def test_supply_mode_warehouse_defaults_are_used_before_global_defaults(self):
+		settings = frappe._dict(
+			{
+				"default_material_request_type": "Purchase",
+				"default_source_warehouse": "Global Source",
+				"default_target_warehouse": "Global Target",
+				"warehouse_defaults": {
+					"Purchase": frappe._dict({"target_warehouse": "Raw Stores"}),
+					"Material Transfer": frappe._dict({"source_warehouse": "Transfer Source", "target_warehouse": "Transfer Target"}),
+				},
+			}
+		)
+
+		purchase = planning._route_dict("Purchase", settings)
+		transfer = planning._route_dict("Material Transfer", settings)
+		manufacture = planning._route_dict("Manufacture", settings)
+
+		self.assertEqual(purchase.target_warehouse, "Raw Stores")
+		self.assertIsNone(purchase.source_warehouse)
+		self.assertEqual(transfer.source_warehouse, "Transfer Source")
+		self.assertEqual(transfer.target_warehouse, "Transfer Target")
+		self.assertIsNone(manufacture.target_warehouse)
+
+	def test_supply_rule_blank_warehouse_falls_back_to_supply_mode_default(self):
+		settings = frappe._dict(
+			{
+				"default_material_request_type": "Purchase",
+				"default_source_warehouse": "Global Source",
+				"default_target_warehouse": "Global Target",
+				"warehouse_defaults": {"Purchase": frappe._dict({"target_warehouse": "Raw Stores"})},
+			}
+		)
+
+		blank_rule = frappe._dict({"name": "MRP-SR-001", "supply_mode": "Purchase", "material_request_type": "Purchase"})
+		explicit_rule = frappe._dict(
+			{
+				"name": "MRP-SR-002",
+				"supply_mode": "Purchase",
+				"material_request_type": "Purchase",
+				"target_warehouse": "Rule Stores",
+			}
+		)
+
+		self.assertEqual(planning._route_from_rule(blank_rule, settings, frappe._dict({})).target_warehouse, "Raw Stores")
+		self.assertEqual(planning._route_from_rule(explicit_rule, settings, frappe._dict({})).target_warehouse, "Rule Stores")
+
+	def test_candidate_warehouse_priority_keeps_item_before_global_default(self):
+		original_get_item_values = planning._get_item_values
+		original_resolve = planning._resolve_supply_route
+		original_requirement_type = planning._get_requirement_type
+		planning._get_item_values = lambda item_code: frappe._dict(
+			{"item_name": "Raw Material", "stock_uom": "Kg", "default_warehouse": "Item Stores"}
+		)
+		planning._resolve_supply_route = lambda item_code, company, customer, warehouse, settings: frappe._dict({"supply_mode": "Purchase"})
+		planning._get_requirement_type = lambda item_code: "Raw Material"
+		try:
+			candidate = planning._candidate_from_item(
+				frappe._dict({"name": "MRP-RUN-001", "company": "Test Company"}),
+				frappe._dict({"default_target_warehouse": "Global Target"}),
+				frappe._dict({"name": "SNAP-001", "item_code": "FG-001", "required_date": "2026-05-01", "warehouse": None}),
+				"RM-001",
+				1,
+				None,
+				None,
+				1,
+				"FG-001 > RM-001",
+			)
+		finally:
+			planning._get_item_values = original_get_item_values
+			planning._resolve_supply_route = original_resolve
+			planning._get_requirement_type = original_requirement_type
+
+		self.assertEqual(candidate.warehouse, "Item Stores")
+
 	def test_purchase_order_qty_respects_moq_and_multiple(self):
 		candidate = planning.RequirementCandidate(
 			demand_snapshot="TEST-DEMAND",
