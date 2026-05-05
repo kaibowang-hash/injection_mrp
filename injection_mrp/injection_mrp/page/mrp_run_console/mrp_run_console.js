@@ -11,7 +11,7 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 	let refreshTimer = null;
 
 	const columns = [
-		{ label: __("Run"), fieldname: "name", formatter: (value) => ui.doc_link("MRP Run", value) },
+		{ label: __("Run", null, "Injection MRP"), fieldname: "name", formatter: (value) => ui.doc_link("MRP Run", value) },
 		{ label: __("Type"), fieldname: "run_type", formatter: (value) => ui.code_badge(value, { tone: value === "Firm APS" ? "green" : "blue" }) },
 		{ label: __("Status"), fieldname: "status", formatter: (value) => ui.code_badge(value, { kind: "status" }) },
 		{ label: __("Company"), fieldname: "company" },
@@ -83,7 +83,7 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 		);
 		const summary = data.summary || {};
 		const comparisonColumns = [
-			{ label: __("Change"), fieldname: "change_type", formatter: (value) => ui.code_badge(value, { tone: value === "Increased" ? "orange" : value === "Decreased" ? "blue" : value === "Removed" ? "red" : "green" }) },
+			{ label: __("Change", null, "Injection MRP"), fieldname: "change_type", formatter: (value) => ui.code_badge(value, { tone: value === "Increased" ? "orange" : value === "Decreased" ? "blue" : value === "Removed" ? "red" : "green" }) },
 			{ label: __("Item"), fieldname: "item_code" },
 			{ label: __("Warehouse"), fieldname: "warehouse" },
 			{ label: __("Required Date"), fieldname: "required_date", formatter: ui.format_date },
@@ -127,7 +127,7 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 				await load();
 			},
 			title,
-			__("Queue")
+			__("Queue", null, "Injection MRP")
 		);
 	}
 

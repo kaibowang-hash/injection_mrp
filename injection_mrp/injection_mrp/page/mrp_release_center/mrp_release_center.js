@@ -15,7 +15,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 	const itemStatuses = ["Pending", "Applied", "Skipped", "Exception"];
 	const columns = [
 		{ label: __("Batch"), fieldname: "name", formatter: (value) => ui.doc_link("MRP Proposal Batch", value) },
-		{ label: __("Run"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
+		{ label: __("Run", null, "Injection MRP"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
 		{ label: __("Type"), fieldname: "proposal_type", formatter: (value) => ui.code_badge(value, { tone: value === "Firm APS" ? "green" : "blue" }) },
 		{ label: __("Status"), fieldname: "status", formatter: (value) => ui.code_badge(value, { kind: "status" }) },
 		{ label: __("Company"), fieldname: "company" },
@@ -30,13 +30,13 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 
 	function select_html(fieldname, values, selected, readOnly) {
 		if (readOnly) {
-			return ui.escape(__(selected || ""));
+			return ui.escape(ui.translate(selected || ""));
 		}
 		return `
 			<select class="form-control input-xs imrp-edit-input" data-field="${fieldname}">
 				<option value=""></option>
 				${values
-					.map((value) => `<option value="${ui.escape(value)}" ${value === selected ? "selected" : ""}>${ui.escape(__(value))}</option>`)
+					.map((value) => `<option value="${ui.escape(value)}" ${value === selected ? "selected" : ""}>${ui.escape(ui.translate(value))}</option>`)
 					.join("")}
 			</select>
 		`;
@@ -68,7 +68,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 			return "";
 		}
 		const currency = item.currency || "";
-		const rate = item.estimated_rate ? `${__("Rate")} ${ui.format_number(item.estimated_rate)}` : "";
+		const rate = item.estimated_rate ? `${__("Rate", null, "Injection MRP")} ${ui.format_number(item.estimated_rate)}` : "";
 		const amount = item.estimated_amount ? `${__("Amount")} ${ui.format_number(item.estimated_amount)}` : "";
 		return [currency, rate, amount].filter(Boolean).join(" · ");
 	}
@@ -135,7 +135,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 								<th>${__("Purchase Constraints")}</th>
 								<th>${__("Order Excess")}</th>
 								<th>${__("Estimated")}</th>
-								<th>${__("Action")}</th>
+								<th>${__("Action", null, "Injection MRP")}</th>
 								<th>${__("Status")}</th>
 								<th>${__("Skip Reason")}</th>
 								<th>${__("Actions")}</th>
@@ -190,7 +190,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 					{ label: __("Currency"), fieldname: "currency" },
 					{ label: __("Procurement Source"), fieldname: "procurement_source" },
 					{ label: __("Procurement Constraint Summary"), fieldname: "procurement_constraint_summary" },
-					{ label: __("Action"), fieldname: "action" },
+					{ label: __("Action", null, "Injection MRP"), fieldname: "action" },
 					{ label: __("Status"), fieldname: "status" },
 					{ label: __("Skip Reason"), fieldname: "skip_reason" },
 				],
@@ -269,7 +269,7 @@ frappe.pages["mrp-release-center"].on_page_load = function (wrapper) {
 			{
 				title: __("Proposal"),
 				rows: [
-					{ label: __("Run"), html: ui.doc_link("MRP Run", batch.mrp_run) },
+					{ label: __("Run", null, "Injection MRP"), html: ui.doc_link("MRP Run", batch.mrp_run) },
 					{ label: __("Type"), value: batch.proposal_type },
 					{ label: __("Status"), value: batch.status },
 					{ label: __("Items"), value: items.length },

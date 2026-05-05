@@ -12,7 +12,7 @@ frappe.pages["mrp-pegging-detail"].on_page_load = function (wrapper) {
 
 	const columns = [
 		{ label: __("Pegging"), fieldname: "name", formatter: (value) => ui.doc_link("MRP Pegging Line", value) },
-		{ label: __("Run"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
+		{ label: __("Run", null, "Injection MRP"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
 		{ label: __("Type"), fieldname: "run_type", formatter: (value) => ui.code_badge(value, { tone: value === "Firm APS" ? "green" : "blue" }) },
 		{
 			label: __("Warning"),
