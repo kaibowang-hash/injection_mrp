@@ -11,7 +11,7 @@ frappe.pages["mrp-material-workbench"].on_page_load = function (wrapper) {
 	let rows = [];
 	const columns = [
 		{ label: __("Requirement"), fieldname: "name", formatter: (value) => ui.doc_link("MRP Requirement Line", value) },
-		{ label: __("Run"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
+		{ label: __("Run", null, "Injection MRP"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
 		{ label: __("Type"), fieldname: "run_type", formatter: (value) => ui.code_badge(value, { tone: value === "Firm APS" ? "green" : "blue" }) },
 		{ label: __("Commitment"), fieldname: "commitment_type", formatter: (value) => ui.code_badge(value, { tone: value === "Prebuy" ? "orange" : "green" }) },
 		{ label: __("Status"), fieldname: "status", formatter: (value) => ui.code_badge(value, { kind: "status" }) },
@@ -31,7 +31,7 @@ frappe.pages["mrp-material-workbench"].on_page_load = function (wrapper) {
 		{ label: __("WO"), fieldname: "open_wo_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("Prebuy Available"), fieldname: "prebuy_available_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("Prebuy"), fieldname: "prebuy_consumed_qty", numeric: true, formatter: ui.format_number },
-		{ label: __("Planned"), fieldname: "new_supply_qty", numeric: true, formatter: ui.format_number },
+		{ label: __("Planned", null, "Injection MRP"), fieldname: "new_supply_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("Order Excess"), fieldname: "order_excess_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("Net"), fieldname: "net_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("Order Date"), fieldname: "suggested_order_date", formatter: ui.format_date },
@@ -112,7 +112,7 @@ frappe.pages["mrp-material-workbench"].on_page_load = function (wrapper) {
 				title: __("Requirement"),
 				rows: [
 					{ label: __("Item"), html: ui.item_cell(requirement.item_code, requirement.item_name || requirement.description) },
-					{ label: __("Run"), html: ui.doc_link("MRP Run", requirement.mrp_run) },
+					{ label: __("Run", null, "Injection MRP"), html: ui.doc_link("MRP Run", requirement.mrp_run) },
 					{ label: __("Demand Item"), html: ui.item_cell(requirement.demand_item_code, demand.item_name || demand.description) },
 					{ label: __("Supply Mode"), value: ui.translate(requirement.supply_mode) },
 					{ label: __("Material Request Type"), value: ui.translate(requirement.material_request_type) },

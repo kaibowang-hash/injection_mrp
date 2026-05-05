@@ -11,7 +11,7 @@ frappe.pages["mrp-demand-console"].on_page_load = function (wrapper) {
 	let rows = [];
 	const columns = [
 		{ label: __("Snapshot"), fieldname: "name", formatter: (value) => ui.doc_link("MRP Demand Snapshot", value) },
-		{ label: __("Run"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
+		{ label: __("Run", null, "Injection MRP"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
 		{ label: __("Type"), fieldname: "demand_type", formatter: (value) => ui.code_badge(value, { tone: value === "APS" ? "green" : "blue" }) },
 		{ label: __("Status"), fieldname: "status", formatter: (value) => ui.code_badge(value, { kind: "status" }) },
 		{ label: __("Customer"), fieldname: "customer" },

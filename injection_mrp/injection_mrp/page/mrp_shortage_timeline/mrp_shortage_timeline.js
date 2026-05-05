@@ -13,7 +13,7 @@ frappe.pages["mrp-shortage-timeline"].on_page_load = function (wrapper) {
 
 	const alertColumns = [
 		{ label: __("Alert"), fieldname: "name", formatter: (value) => ui.doc_link("MRP Shortage Alert", value) },
-		{ label: __("Run"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
+		{ label: __("Run", null, "Injection MRP"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
 		{ label: __("Warning"), fieldname: "warning_level", formatter: (value) => ui.code_badge(value, { kind: "warning" }) },
 		{ label: __("Status"), fieldname: "status", formatter: (value) => ui.code_badge(value, { kind: "status" }) },
 		{ label: __("Item"), fieldname: "item_code", formatter: (value, row) => ui.item_cell(value, row.item_name || row.description) },
@@ -28,7 +28,7 @@ frappe.pages["mrp-shortage-timeline"].on_page_load = function (wrapper) {
 	];
 
 	const balanceColumns = [
-		{ label: __("Run"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
+		{ label: __("Run", null, "Injection MRP"), fieldname: "mrp_run", formatter: (value) => ui.doc_link("MRP Run", value) },
 		{ label: __("Bucket Type"), fieldname: "bucket_type", formatter: (value) => ui.code_badge(value, { tone: value === "Daily" ? "blue" : "green" }) },
 		{ label: __("Bucket Start"), fieldname: "bucket_start", formatter: ui.format_date },
 		{ label: __("Bucket End"), fieldname: "bucket_end", formatter: ui.format_date },
@@ -63,7 +63,7 @@ frappe.pages["mrp-shortage-timeline"].on_page_load = function (wrapper) {
 				title: __("Shortage Alert"),
 				rows: [
 					{ label: __("Item"), html: ui.item_cell(row.item_code, row.item_name) },
-					{ label: __("Run"), html: ui.doc_link("MRP Run", row.mrp_run) },
+					{ label: __("Run", null, "Injection MRP"), html: ui.doc_link("MRP Run", row.mrp_run) },
 					{ label: __("Warehouse"), value: row.warehouse },
 					{ label: __("First Shortage Date"), value: ui.format_date(row.first_shortage_date) },
 					{ label: __("Shortage Qty"), value: ui.format_number(row.shortage_qty) },

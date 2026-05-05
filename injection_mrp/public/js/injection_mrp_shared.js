@@ -6,6 +6,7 @@ frappe.provide("injection_mrp.ui");
 	}
 
 	injection_mrp.ui.__initialized = true;
+	injection_mrp.ui.translation_context = "Injection MRP";
 	injection_mrp.ui.__action_role_map = {
 		run_forecast_prebuy: ["System Manager", "MPLM", "MPLP"],
 		run_firm_aps_mrp: ["System Manager", "MPLM", "MPLP"],
@@ -77,11 +78,11 @@ frappe.provide("injection_mrp.ui");
 		return frappe.utils.escape_html(value == null ? "" : String(value));
 	};
 
-	injection_mrp.ui.translate = function (value) {
+	injection_mrp.ui.translate = function (value, context) {
 		if (value == null || value === "") {
 			return "";
 		}
-		return __(String(value));
+		return __(String(value), null, context || injection_mrp.ui.translation_context);
 	};
 
 	injection_mrp.ui.__local_icons = new Set(["download", "filter", "search", "x"]);
