@@ -507,6 +507,20 @@ Buffer Top of Yellow,缓冲黄区上限
 Buffer Top of Green,缓冲绿区上限
 Buffer Lead Time Days,缓冲前置时间（天）
 Refresh Buffer,刷新缓冲
+"Select a reusable buffer policy. The profile can fill lead time, variability and order cycle factors.",选择可复用的缓冲策略。策略会带出前置时间、波动和订货周期系数。
+Decoupled Lead Time in days. MRP uses this before supplier or item lead time; leave 0 only when you want MRP to fall back.,解耦前置时间天数。MRP 会优先使用这里的值；只有需要回退到供应商或物料前置时间时才填 0。
+Multiplier used in red and green zone calculations. Keep 1 for a normal lead-time buffer.,用于红区和绿区计算的前置时间倍数。普通前置时间缓冲保持 1 即可。
+Safety factor for demand or supplier variability. Higher values increase the red safety zone.,需求或供应波动的安全系数。数值越高，红色安全区越大。
+Minimum days of demand to cover in the green zone. Use 0 when MOQ or DLT should drive replenishment.,绿区至少覆盖的需求天数。若希望由最小下单量或 DLT 驱动补货，可填 0。
+Optional purchase or production minimum. Recommended Qty will be raised to at least this quantity.,可选的采购或生产最小量。建议补货数量会至少提高到该数量。
+Optional order multiple. Recommended Qty will be rounded up to this multiple.,可选的下单倍量。建议补货数量会向上取整到该倍量。
+Choose how ADU is calculated. The form only shows fields needed by the selected method.,选择平均日用量的计算方式。表单只显示当前方式需要填写的字段。
+Only used when ADU Calculation Method is Fixed. Hidden for historical or MRP-based methods.,仅在平均日用量计算方式为固定时使用。选择历史实际或未来 MRP 时会隐藏。
+Number of past days used for historical ADU. It reads negative Stock Ledger Entries for this item and warehouse.,历史平均日用量使用的过去天数。系统读取该物料和仓库的负数库存流水。
+Number of future days used for MRP-based ADU. It reads demand from the current or latest completed MRP run.,未来 MRP 平均日用量使用的未来天数。系统读取当前或最近已完成 MRP 运算的需求。
+Weight for historical ADU in Blended mode. The system normalizes past and future factors.,混合模式中历史实际的权重。系统会自动归一化历史和未来权重。
+Weight for future MRP ADU in Blended mode. The system normalizes past and future factors.,混合模式中未来 MRP 的权重。系统会自动归一化历史和未来权重。
+Calculated average daily usage. Save or click Refresh Buffer to recalculate.,系统计算出的平均日用量。保存单据或点击“刷新缓冲”后重新计算。
 No stock buffer is linked to this requirement.,该需求未关联库存缓冲。
 No stock buffer data found.,未找到库存缓冲数据。
 Red zone,红区
