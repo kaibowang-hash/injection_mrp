@@ -14,8 +14,15 @@ doctype_js = {
 
 doc_events = {
 	"Item": {
-		"validate": "injection_mrp.services.stock_buffer.validate_item_lead_time_lock",
+		"validate": "injection_mrp.services.stock_buffer.validate_item",
+		"on_update": "injection_mrp.services.stock_buffer.ensure_item_stock_buffer",
 	},
+}
+
+scheduler_events = {
+	"daily": [
+		"injection_mrp.tasks.stock_buffer.enqueue_daily_stock_buffer_refresh",
+	],
 }
 
 app_include_css = [

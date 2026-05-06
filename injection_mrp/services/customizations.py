@@ -89,6 +89,17 @@ def ensure_default_buffer_profile():
 	).insert(ignore_permissions=True)
 
 
+def ensure_stock_buffer_item_defaults():
+	if not _has_field("Item", "custom_mrp_use_stock_buffer"):
+		return
+	if frappe.db.get_global("injection_mrp_stock_buffer_item_defaults_applied"):
+		return
+	from injection_mrp.services import stock_buffer
+
+	stock_buffer.apply_stock_buffer_item_group_defaults(ignore_permissions=True)
+	frappe.db.set_global("injection_mrp_stock_buffer_item_defaults_applied", "1")
+
+
 def _standard_custom_fields_for_site():
 	fields = {doctype: [dict(field) for field in field_list] for doctype, field_list in STANDARD_CUSTOM_FIELDS.items()}
 	item_fields = fields.get("Item") or []

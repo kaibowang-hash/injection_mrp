@@ -62,6 +62,7 @@ CONFIG_FLAGS = {"read", "select", "write", "report", "export", "print", "email",
 MRP_PAGE_NAMES = (
 	"mrp-demand-console",
 	"mrp-material-workbench",
+	"mrp-stock-buffer-console",
 	"mrp-pegging-detail",
 	"mrp-shortage-timeline",
 	"mrp-run-console",

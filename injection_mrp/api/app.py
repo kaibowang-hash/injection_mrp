@@ -192,6 +192,12 @@ def get_stock_buffer_chart_data(buffer_name=None, item_code=None, company=None, 
 
 
 @frappe.whitelist()
+def get_stock_buffer_console_data(filters=None, limit_start=0, limit_page_length=500):
+	_require_any_role(READ_ROLES)
+	return stock_buffer.get_stock_buffer_console_data(_parse_json(filters), limit_start, limit_page_length)
+
+
+@frappe.whitelist()
 def refresh_stock_buffer(buffer_name):
 	_require_any_role(PLAN_ROLES)
 	doc = _require_doc_permission("MRP Stock Buffer", buffer_name, "write")
@@ -199,24 +205,38 @@ def refresh_stock_buffer(buffer_name):
 
 
 @frappe.whitelist()
-def recalculate_stock_buffers(company=None, item_code=None, warehouse=None):
+def recalculate_stock_buffers(company=None, item_code=None, warehouse=None, item_codes=None, filters=None):
 	_require_any_role(PLAN_ROLES)
-	filters = {"active": 1}
-	if company:
-		filters["company"] = company
-	if item_code:
-		filters["item_code"] = item_code
-	if warehouse:
-		filters["warehouse"] = warehouse
-	rows = frappe.get_all("MRP Stock Buffer", filters=filters, fields=["name"], limit_page_length=10000)
-	buffers = []
-	for row in rows:
-		doc = _require_doc_permission("MRP Stock Buffer", row.name, "write")
-		buffers.append(stock_buffer.refresh_buffer(doc, persist=True))
-	return {
-		"count": len(rows),
-		"buffers": buffers,
-	}
+	parsed_filters = _parse_json(filters)
+	parsed_item_codes = _parse_json(item_codes) if isinstance(item_codes, str) else item_codes
+	if parsed_filters and not parsed_item_codes and not item_code and not warehouse:
+		console_data = stock_buffer.get_stock_buffer_console_data(parsed_filters, limit_start=0, limit_page_length=10000)
+		parsed_item_codes = [row.item_code for row in console_data.get("rows", []) if row.get("stock_buffer")]
+		company = company or parsed_filters.get("company")
+	return stock_buffer.refresh_active_stock_buffers(
+		company=company,
+		item_code=item_code,
+		warehouse=warehouse,
+		item_codes=parsed_item_codes,
+	)
+
+
+@frappe.whitelist()
+def create_missing_stock_buffers(filters=None, item_codes=None):
+	_require_any_role(PLAN_ROLES)
+	return stock_buffer.create_missing_stock_buffers(
+		_parse_json(filters),
+		_parse_json(item_codes) if isinstance(item_codes, str) else item_codes,
+	)
+
+
+@frappe.whitelist()
+def apply_stock_buffer_item_group_defaults(filters=None, item_codes=None):
+	_require_any_role(PLAN_ROLES)
+	return stock_buffer.apply_stock_buffer_item_group_defaults(
+		_parse_json(filters),
+		_parse_json(item_codes) if isinstance(item_codes, str) else item_codes,
+	)
 
 
 @frappe.whitelist()

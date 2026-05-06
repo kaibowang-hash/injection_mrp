@@ -1,4 +1,5 @@
 import unittest
+from datetime import datetime
 
 import frappe
 
@@ -393,6 +394,113 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertNotIn("lead_time_days", calls[0][2])
 		self.assertEqual(calls[0][2]["custom_mrp_lead_time_days"], 18)
 		self.assertEqual(calls[1][2]["lead_time_days"], 18)
+
+	def test_stock_buffer_console_statuses_are_foolproof(self):
+		original_has_field = stock_buffer._has_field
+		original_now = stock_buffer.now_datetime
+		try:
+			stock_buffer._has_field = lambda doctype, fieldname: doctype == "Item" and fieldname == "is_stock_item"
+			item = frappe._dict({"custom_mrp_use_stock_buffer": 1, "is_stock_item": 1})
+			self.assertEqual(stock_buffer._get_console_status(item, None, [], 0), "Missing Warehouse")
+			self.assertEqual(stock_buffer._get_console_status(item, "Stores", [], 0), "Missing Buffer")
+			self.assertEqual(stock_buffer._get_console_status(item, "Stores", [], 1), "Conflict")
+			self.assertEqual(
+				stock_buffer._get_console_status(item, "Stores", [frappe._dict({"dlt_days": 0})], 0),
+				"Missing DLT",
+			)
+			self.assertEqual(
+				stock_buffer._get_console_status(
+					item,
+					"Stores",
+					[frappe._dict({"dlt_days": 10, "is_default_for_item": 0})],
+					1,
+				),
+				"Conflict",
+			)
+			stock_buffer.now_datetime = lambda: datetime(2026, 5, 2, 12, 0, 0)
+			self.assertEqual(
+				stock_buffer._get_console_status(
+					item,
+					"Stores",
+					[frappe._dict({"dlt_days": 10, "last_calculated_on": datetime(2026, 5, 1, 0, 0, 0)})],
+					0,
+				),
+				"Needs Refresh",
+			)
+			self.assertEqual(
+				stock_buffer._get_console_status(
+					item,
+					"Stores",
+					[frappe._dict({"dlt_days": 10, "last_calculated_on": datetime(2026, 5, 2, 11, 0, 0)})],
+					0,
+				),
+				"Active",
+			)
+		finally:
+			stock_buffer._has_field = original_has_field
+			stock_buffer.now_datetime = original_now
+
+	def test_stock_buffer_group_defaults_apply_raw_material_and_packaging(self):
+		original_has_field = stock_buffer._has_field
+		original_get_all = stock_buffer.frappe.get_all
+		original_db = vars(stock_buffer.frappe)["db"]
+		original_group_default = stock_buffer._item_group_defaults_to_stock_buffer
+		calls = []
+		try:
+			stock_buffer._has_field = lambda doctype, fieldname: (
+				(doctype == "Item" and fieldname in {"custom_mrp_use_stock_buffer", "is_stock_item"})
+			)
+			stock_buffer.frappe.get_all = lambda doctype, filters=None, fields=None, limit_page_length=None: [
+				frappe._dict({"name": "RM-001", "item_group": "Plastic Resin", "is_stock_item": 1}),
+				frappe._dict({"name": "PK-001", "item_group": "Packaging", "is_stock_item": 1}),
+				frappe._dict({"name": "FG-001", "item_group": "Plastic Part", "is_stock_item": 1}),
+				frappe._dict({"name": "SRV-001", "item_group": "Service", "is_stock_item": 0}),
+			]
+			stock_buffer._item_group_defaults_to_stock_buffer = lambda item_group: item_group in {
+				"Plastic Resin",
+				"Packaging",
+			}
+			stock_buffer.frappe.db = frappe._dict(
+				{"set_value": lambda doctype, name, fieldname, value, **kwargs: calls.append((name, value))}
+			)
+
+			result = stock_buffer.apply_stock_buffer_item_group_defaults()
+		finally:
+			stock_buffer._has_field = original_has_field
+			stock_buffer.frappe.get_all = original_get_all
+			stock_buffer.frappe.db = original_db
+			stock_buffer._item_group_defaults_to_stock_buffer = original_group_default
+
+		self.assertEqual(result["enabled"], 2)
+		self.assertEqual(result["disabled"], 2)
+		self.assertEqual(calls, [("RM-001", 1), ("PK-001", 1), ("FG-001", 0), ("SRV-001", 0)])
+
+	def test_item_buffer_warehouse_uses_company_item_default_only(self):
+		original_doctype_exists = stock_buffer._doctype_exists
+		original_has_field = stock_buffer._has_field
+		original_db = vars(stock_buffer.frappe)["db"]
+		calls = []
+
+		def fake_get_value(doctype, filters, fieldname=None, **kwargs):
+			calls.append(dict(filters))
+			if filters.get("company"):
+				return None
+			return "Fallback Stores"
+
+		try:
+			stock_buffer._doctype_exists = lambda doctype: doctype == "Item Default"
+			stock_buffer._has_field = lambda doctype, fieldname: doctype == "Item Default" and fieldname == "company"
+			stock_buffer.frappe.db = frappe._dict({"get_value": fake_get_value})
+
+			warehouse = stock_buffer._get_item_buffer_warehouse(frappe._dict({"name": "RM-001"}), "Test Company")
+		finally:
+			stock_buffer._doctype_exists = original_doctype_exists
+			stock_buffer._has_field = original_has_field
+			stock_buffer.frappe.db = original_db
+
+		self.assertIsNone(warehouse)
+		self.assertEqual(calls[0]["company"], "Test Company")
+		self.assertEqual(len(calls), 1)
 
 	def test_order_qty_rounding_only_applies_to_purchase(self):
 		candidate = planning.RequirementCandidate(
