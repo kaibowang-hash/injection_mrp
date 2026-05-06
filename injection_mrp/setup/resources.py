@@ -1,4 +1,25 @@
 STANDARD_CUSTOM_FIELDS = {
+	"Item": [
+		{
+			"fieldname": "custom_mrp_default_stock_buffer",
+			"label": "Default MRP Stock Buffer",
+			"fieldtype": "Link",
+			"options": "MRP Stock Buffer",
+			"insert_after": "lead_time_days",
+			"read_only": 1,
+			"no_copy": 1,
+			"description": "Owned by Injection MRP. Default buffer controls MRP lead time.",
+		},
+		{
+			"fieldname": "custom_mrp_lead_time_days",
+			"label": "MRP Lead Time Days",
+			"fieldtype": "Int",
+			"insert_after": "custom_mrp_default_stock_buffer",
+			"read_only": 1,
+			"no_copy": 1,
+			"description": "Owned by Injection MRP. Used on ERPNext versions without native Item Lead Time Days.",
+		},
+	],
 	"Material Request": [
 		{
 			"fieldname": "custom_mrp_run",

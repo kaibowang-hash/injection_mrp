@@ -12,6 +12,12 @@ doctype_js = {
 	"MRP Proposal Batch": "public/js/mrp_proposal_batch.js",
 }
 
+doc_events = {
+	"Item": {
+		"validate": "injection_mrp.services.stock_buffer.validate_item_lead_time_lock",
+	},
+}
+
 app_include_css = [
 	"/assets/injection_mrp/css/injection_mrp.css",
 ]

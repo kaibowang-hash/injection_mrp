@@ -1,0 +1,105 @@
+短文本,文本类型,完整文本,文本含义,文本释义
+MRP,系统/模块,Material Requirements Planning,物料需求计划,根据需求、库存、在途供应和 BOM 展开结果计算净需求并生成采购/生产/调拨建议。
+APS,系统缩写,Advanced Planning and Scheduling,高级计划排程,外部排程计划来源；在本 app 中用于 firm APS 确认需求。
+BOM,单据/字段,Bill of Materials,物料清单,制造或外协物料的组件结构，是 MRP 展开下阶物料需求的基础。
+UOM,字段,Unit of Measure,计量单位,物料数量使用的单位。
+MOQ,采购约束,Minimum Order Quantity,最低采购量,采购建议数量低于最低采购量时会被上调。
+DLT,库存缓冲,Decoupled Lead Time,解耦前置时间,库存缓冲用于覆盖补货链路的时间窗口；MRP 优先使用缓冲 DLT 倒推建议下单日期。
+ADU,库存缓冲,Average Daily Usage,平均日用量,缓冲区计算的日均需求量，可来自固定值、历史消耗、未来 MRP 或混合算法。
+NFP,库存缓冲,Net Flow Position,净流量位置,现有库存加 DLT 内在途供应再减合格需求后的补货判断位置。
+BUF,需求类型/主数据,Stock Buffer,库存缓冲,按红黄绿缓冲区和净流量位置生成补货建议的 MRP 需求来源。
+RED,缓冲优先级,Red,红区,净流量位置低于红区上限，表示高优先级补货风险。
+YLW,缓冲优先级,Yellow,黄区,净流量位置位于红区和黄区之间，表示需要计划补货。
+GRN,缓冲优先级,Green,绿区,净流量位置位于黄区以上，通常不需要立即补货。
+FC,需求类型,Forecast,预测,来自客户排期或预测数据的需求来源。
+FP,运算类型/建议类型,Forecast Prebuy,远期预采,基于预测需求提前生成预采供应或预采建议。
+APS,运算类型/建议类型,Firm APS,APS 确认,以 APS 已确认或已应用排程作为 firm 需求进行 MRP 运算。
+APS,需求类型,APS,APS,APS 排程结果产生的确认需求来源。
+MANU,运算类型/需求类型,Manual,手工,人工创建或手动触发的 MRP 类型/需求来源。
+SO,需求类型,Sales Order,销售订单,来自销售订单未交数量的需求。
+SS,需求类型,Safety Stock,安全库存,为补足物料安全库存产生的需求。
+PP,需求类型/供应类型,Production Plan,生产计划,生产计划可作为需求来源，也可作为供应抵扣来源。
+RM,需求分类,Raw Material,原材料,BOM 展开后需要采购或领用的原材料需求。
+INTE,需求分类,Intermediate,半成品,BOM 中间层物料或半成品需求。
+PACK,需求分类,Packaging,包材,包装材料需求。
+SUBC,需求分类,Subcontract,外协,外协/委外相关需求分类。
+FG,需求分类,Finished Good,成品,最终成品层级需求。
+PB,承诺类型/供应类型,Prebuy,预采,预测阶段提前采购或预留的供应/承诺。
+F,承诺类型,Firm,确认,确认需求对应的承诺类型。
+DFT,状态,Draft,草稿,单据或运算尚未进入正式处理。
+RDY,状态,Ready,待处理,建议批次或需求已准备好进入下一步处理。
+PND,状态,Pending,待处理,建议明细等待应用或处理。
+QUE,状态,Queued,已排队,MRP 后台任务已进入队列。
+RUN,状态,Running,运行中,MRP 运算正在后台执行。
+APL,状态,Applied,已应用,建议批次或明细已经被应用。
+REL,状态,Released,已释放,MRP 运算或需求结果已经释放。
+SUP,状态,Superseded,已被覆盖,旧建议批次被新的 MRP 运算覆盖。
+EXP,状态,Expired,已过期,建议批次已过有效期或不再适用。
+CON,状态,Consumed,已冲销,需求或供应已被消耗/冲销。
+CLD,状态,Closed,已关闭,流程已关闭，不再作为未处理对象。
+CAL,状态,Calculated,已计算,MRP 运算已完成计算但未生成/释放建议。
+PRP,状态,Proposal Generated,已生成建议,MRP 运算已生成建议批次。
+EXC,状态,Exception,异常,单据或明细存在异常，需要处理。
+WRN,严重级别/预警级别,Warning,预警/警告,存在风险但通常不阻止继续处理。
+ERR,严重级别,Error,错误,出现错误，需要修正后重试或处理。
+FLD,状态,Failed,失败,MRP 运算或任务执行失败。
+CXL,状态,Cancelled,已取消,运算、需求或单据已取消。
+REJ,状态,Rejected,已驳回,建议批次被拒绝。
+OPN,状态/处理状态,Open,未处理,异常、欠料或需求仍处于打开状态。
+REV,状态,Reviewed,已复核,欠料预警已被人工查看或复核。
+RSL,处理状态,Resolved,已解决,异常已处理完成。
+IGN,处理状态,Ignored,已忽略,异常经判断后不再跟进。
+INF,严重级别/预警级别,Info,提示,提示类信息，风险级别低于 Warning。
+CRT,预警级别,Critical,严重,关键风险，例如硬性欠料或严重滞后。
+OK,预警级别,None,无,没有预警或风险。
+ALLO,状态,Allocated,已匹配,供应已经被匹配给需求。
+PROP,状态,Proposed,已建议,系统建议新建供应或动作。
+EXCE,状态,Excess,超额,供应未被需求消耗，形成超额供应。
+SKIP,状态,Skipped,已跳过,建议明细被人工或规则跳过。
+PUR,供应方式/物料需求类型,Purchase,采购,通过采购补足需求。
+MFG,供应方式/物料需求类型,Manufacture,制造,通过内部生产补足需求。
+MFG,供应方式兼容值,Manufacturing,制造,Manufacture 的兼容展示值，短码同为 MFG。
+SUB,供应方式/物料需求类型,Subcontracting,外协,通过委外加工补足需求。
+CP,供应方式/物料需求类型,Customer Provided,客供料,由客户提供物料，通常不生成采购建议。
+MT,供应方式/物料需求类型,Material Transfer,物料调拨,通过仓库间调拨补足需求。
+MI,物料需求类型,Material Issue,物料发料,通过发料类型的物料需求处理。
+SS,供应方式,Supplier Supplied,供应商自供,供应商自行提供物料，MRP 不生成常规采购动作。
+NA,供应方式/动作,No Action,无动作,不需要 MRP 创建供应或释放动作。
+STK,供应类型,Stock,库存,当前可用库存供应。
+MR,供应类型/单据,Material Request,物料需求,ERPNext 物料需求单。
+PO,供应类型/单据,Purchase Order,采购订单,已存在采购订单供应。
+WO,供应类型/单据,Work Order,工单,已存在生产工单供应。
+PLN,供应类型,Planned Supply,计划供应,MRP 建议新建的供应。
+OMR,供应摘要,Open MR,未关闭物料需求,未关闭的 Material Request 数量。
+OPO,供应摘要,Open PO,未关闭采购订单,未关闭的 Purchase Order 数量。
+OWO,供应摘要,Open WO,未关闭工单,未关闭的 Work Order 数量。
+D,日期桶类型,Daily,每日,滚动余额按天显示的日期桶。
+W,日期桶类型,Weekly,每周,滚动余额按周显示的日期桶。
+MLT,预警类别,Missing Lead Time,缺少前置时间,物料或供应商未维护前置时间，建议日期可靠性下降。
+PDO,预警类别,Past Due Order,下单已滞后,建议下单日期早于今天，采购或生产已落后需求节奏。
+LS,预警类别,Late Supply,供应延迟,预计到货晚于物料需求日期。
+ES,预警类别,Early Supply,供应过早,预计到货早于物料需求日期且超过提前预警阈值。
+XS,预警类别,Excess Supply,供应超额,现有供应未被本次 MRP 需求消耗。
+XPB,预警类别,Excess Prebuy,预采超额,firm APS 需求冲销后仍有预测预采剩余。
+MB,预警类别,Missing BOM,缺少 BOM,制造或外协物料没有可用的已提交启用 BOM。
+MS,预警类别,Missing Supplier,缺少供应商,采购建议未匹配到供应商。
+PCR,预警类别,Purchase Constraint Rounding,采购约束取整,建议数量因 MOQ 或下单倍量被向上取整。
+UAQ,预警类别,Unscheduled APS Quantity,APS 未排足数量,APS 计划数量大于已排程数量，只有已排程部分足够 firm 给 MRP 使用。
+NA,调整动作,No Adjustment,不调整,匹配供应无需提前、延后、取消或复核。
+EXP,调整动作,Expedite,建议提前,供应晚于需求日期，建议催交或提前。
+DLY,调整动作,Delay,建议延后,供应早于需求日期，建议延后到货。
+CXL,调整动作,Cancel,建议取消,超额供应建议取消。
+REV,调整动作,Review,人工复核,需要人工判断是否保留、延后、取消或重分配。
+CMR,调整动作/建议动作,Create Material Request,创建物料需求,建议释放后生成 Material Request。
+CPB,调整动作/建议动作,Consume Prebuy,冲销预采,使用历史预测预采抵扣 firm APS 需求。
+RXP,调整动作/建议动作,Review Excess Prebuy,复核超额预采,firm APS 后剩余预采需要人工复核处理。
+NEW,运算对比,New,新增,当前运算中新增的需求行。
+REMO,运算对比,Removed,移除,上一运算存在但当前运算不再存在的需求行。
+UNCH,运算对比,Unchanged,未变化,当前净需求与上一运算基本一致。
+INCR,运算对比,Increased,增加,当前净需求高于上一运算。
+DECR,运算对比,Decreased,减少,当前净需求低于上一运算。
+CUR,匹配标识,Current Item,当前物料,BOM 展开视图中标记当前正在查看的物料。
+MPLM,角色,MPLM,计划经理,MRP 主负责人，可运行 MRP、维护规则、审核并应用建议批次。
+MPLP,角色,MPLP,计划员,MRP 日常操作人，可运行 MRP、编辑建议批次并应用建议。
+GMC,角色,GMC,管理复核角色,可查看、导出、复核异常和风险，不直接执行 MRP 主动作。
+PMC,角色,PMC,计划协同角色,查看需求、欠料、供需匹配和预警，协同确认生产影响。

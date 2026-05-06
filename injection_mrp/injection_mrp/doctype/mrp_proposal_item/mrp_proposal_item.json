@@ -19,6 +19,14 @@
   "customer",
   "supplier",
   "supplier_lead_time_days",
+  "stock_buffer",
+  "buffer_priority",
+  "buffer_nfp_percent",
+  "buffer_recommended_qty",
+  "buffer_top_of_red",
+  "buffer_top_of_yellow",
+  "buffer_top_of_green",
+  "buffer_lead_time_days",
   "purchase_uom",
   "min_order_qty",
   "order_multiple_qty",
@@ -128,6 +136,57 @@
    "fieldname": "supplier_lead_time_days",
    "fieldtype": "Int",
    "label": "Supplier Lead Time Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "stock_buffer",
+   "fieldtype": "Link",
+   "label": "Stock Buffer",
+   "options": "MRP Stock Buffer",
+   "read_only": 1
+  },
+  {
+   "fieldname": "buffer_priority",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Buffer Priority",
+   "options": "\nRed\nYellow\nGreen",
+   "read_only": 1
+  },
+  {
+   "fieldname": "buffer_nfp_percent",
+   "fieldtype": "Percent",
+   "label": "Buffer NFP %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "buffer_recommended_qty",
+   "fieldtype": "Float",
+   "label": "Buffer Recommended Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "buffer_top_of_red",
+   "fieldtype": "Float",
+   "label": "Buffer Top of Red",
+   "read_only": 1
+  },
+  {
+   "fieldname": "buffer_top_of_yellow",
+   "fieldtype": "Float",
+   "label": "Buffer Top of Yellow",
+   "read_only": 1
+  },
+  {
+   "fieldname": "buffer_top_of_green",
+   "fieldtype": "Float",
+   "label": "Buffer Top of Green",
+   "read_only": 1
+  },
+  {
+   "fieldname": "buffer_lead_time_days",
+   "fieldtype": "Int",
+   "label": "Buffer Lead Time Days",
    "read_only": 1
   },
   {

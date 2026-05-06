@@ -3,6 +3,7 @@ import unittest
 import frappe
 
 from injection_mrp.services import planning
+from injection_mrp.services import stock_buffer
 
 
 class TestPlanningHelpers(unittest.TestCase):
@@ -202,6 +203,196 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertEqual(planning._get_planned_order_qty(120, candidate), 500)
 		self.assertEqual(planning._get_planned_order_qty(512, candidate), 525)
 		self.assertEqual(planning._get_planned_order_qty(500, candidate), 500)
+
+	def test_buffer_zone_and_order_qty_calculation(self):
+		zones = stock_buffer.calculate_zones(
+			adu=2,
+			dlt_days=10,
+			lead_time_factor=0.5,
+			variability_factor=0.5,
+			order_cycle_days=8,
+			min_order_qty=25,
+		)
+
+		self.assertEqual(zones.red_zone_qty, 15)
+		self.assertEqual(zones.yellow_zone_qty, 20)
+		self.assertEqual(zones.green_zone_qty, 25)
+		self.assertEqual(zones.top_of_red, 15)
+		self.assertEqual(zones.top_of_yellow, 35)
+		self.assertEqual(zones.top_of_green, 60)
+		self.assertEqual(stock_buffer.classify_priority(14, zones.top_of_red, zones.top_of_yellow), "Red")
+		self.assertEqual(stock_buffer.classify_priority(20, zones.top_of_red, zones.top_of_yellow), "Yellow")
+		self.assertEqual(stock_buffer.classify_priority(40, zones.top_of_red, zones.top_of_yellow), "Green")
+		self.assertEqual(stock_buffer.adjust_order_qty(26, 12, 10), 30)
+
+	def test_candidate_lead_time_uses_buffer_before_supplier_and_item(self):
+		original_item_lead_time = planning._get_item_lead_time
+		planning._get_item_lead_time = lambda item_code: 99
+		try:
+			candidate = planning.RequirementCandidate(
+				demand_snapshot="TEST-DEMAND",
+				demand_item_code="FG-001",
+				item_code="RM-001",
+				item_name="Raw Material",
+				uom="Kg",
+				warehouse="Stores",
+				required_date="2026-04-30",
+				gross_qty=100,
+				scrap_qty=0,
+				bom=None,
+				bom_item=None,
+				bom_level=1,
+				requirement_type="Raw Material",
+				supplier_lead_time_days=12,
+				buffer_lead_time_days=18,
+			)
+
+			self.assertEqual(planning._get_candidate_lead_time(candidate), 18)
+			candidate.buffer_lead_time_days = 0
+			self.assertEqual(planning._get_candidate_lead_time(candidate), 12)
+			candidate.supplier_lead_time_days = 0
+			self.assertEqual(planning._get_candidate_lead_time(candidate), 99)
+		finally:
+			planning._get_item_lead_time = original_item_lead_time
+
+	def test_safety_stock_demands_use_stock_buffer_top_up_without_persisting(self):
+		original_collect = planning.stock_buffer.collect_buffer_top_up_demands
+		original_item_safety = planning._collect_item_safety_stock_demands
+		calls = []
+		planning.stock_buffer.collect_buffer_top_up_demands = lambda run, persist=False: calls.append(persist) or [
+			frappe._dict(
+				{
+					"name": "MRP-BUF-001",
+					"item_code": "RM-001",
+					"warehouse": "Stores",
+					"recommended_qty": 75,
+					"planning_priority": "Red",
+					"net_flow_position_percent": 22.5,
+				}
+			)
+		]
+		planning._collect_item_safety_stock_demands = lambda run, skip_buffered_items=True: []
+		try:
+			run = frappe._dict({"name": "MRP-RUN-001", "company": "Test Company", "horizon_start": "2026-04-27"})
+			demands = planning._collect_safety_stock_demands(
+				run,
+				frappe._dict({"use_stock_buffer_for_safety_stock": 1}),
+			)
+		finally:
+			planning.stock_buffer.collect_buffer_top_up_demands = original_collect
+			planning._collect_item_safety_stock_demands = original_item_safety
+
+		self.assertEqual(calls, [False])
+		self.assertEqual(len(demands), 1)
+		self.assertEqual(demands[0].demand_type, "Stock Buffer")
+		self.assertEqual(demands[0].qty, 75)
+		self.assertEqual(demands[0].source_doctype, "MRP Stock Buffer")
+
+	def test_item_safety_stock_falls_back_when_no_stock_buffer_exists(self):
+		original_doctype_exists = planning._doctype_exists
+		original_has_field = planning._has_field
+		original_get_all = frappe.get_all
+		original_available_qty = planning._get_available_qty
+		original_buffer_name = planning.stock_buffer.get_buffer_name_for_item
+		try:
+			planning._doctype_exists = lambda doctype: doctype == "Item"
+			planning._has_field = lambda doctype, fieldname: doctype == "Item" and fieldname in {"safety_stock", "default_warehouse"}
+			frappe.get_all = lambda doctype, filters=None, fields=None, limit_page_length=None: [
+				frappe._dict(
+					{
+						"name": "RM-001",
+						"item_name": "Raw Material",
+						"stock_uom": "Kg",
+						"safety_stock": 100,
+						"default_warehouse": "Stores",
+					}
+				)
+			]
+			planning._get_available_qty = lambda item_code, company, warehouse: 25
+			planning.stock_buffer.get_buffer_name_for_item = lambda item_code, company, warehouse: None
+
+			run = frappe._dict({"company": "Test Company", "horizon_start": "2026-04-27", "item_code": None, "warehouse": None})
+			demands = planning._collect_item_safety_stock_demands(run, skip_buffered_items=True)
+
+			planning.stock_buffer.get_buffer_name_for_item = lambda item_code, company, warehouse: "MRP-BUF-001"
+			skipped = planning._collect_item_safety_stock_demands(run, skip_buffered_items=True)
+		finally:
+			planning._doctype_exists = original_doctype_exists
+			planning._has_field = original_has_field
+			frappe.get_all = original_get_all
+			planning._get_available_qty = original_available_qty
+			planning.stock_buffer.get_buffer_name_for_item = original_buffer_name
+
+		self.assertEqual(len(demands), 1)
+		self.assertEqual(demands[0].demand_type, "Safety Stock")
+		self.assertEqual(demands[0].qty, 75)
+		self.assertEqual(demands[0].warehouse, "Stores")
+		self.assertEqual(skipped, [])
+
+	def test_buffer_name_does_not_fall_back_to_default_when_warehouse_is_set(self):
+		original_doctype_exists = stock_buffer._doctype_exists
+		original_db = stock_buffer.frappe.db
+		calls = []
+
+		def fake_get_value(doctype, filters, fieldname=None, *args, **kwargs):
+			calls.append(dict(filters))
+			if filters.get("warehouse"):
+				return None
+			if filters.get("is_default_for_item"):
+				return "MRP-BUF-DEFAULT"
+			return None
+
+		try:
+			stock_buffer._doctype_exists = lambda doctype: doctype == "MRP Stock Buffer"
+			stock_buffer.frappe.db = frappe._dict({"get_value": fake_get_value})
+
+			self.assertIsNone(stock_buffer.get_buffer_name_for_item("RM-001", "Test Company", "Stores"))
+			self.assertEqual(stock_buffer.get_buffer_name_for_item("RM-001", "Test Company", None), "MRP-BUF-DEFAULT")
+		finally:
+			stock_buffer._doctype_exists = original_doctype_exists
+			stock_buffer.frappe.db = original_db
+
+		self.assertEqual(calls[0]["warehouse"], "Stores")
+		self.assertNotIn("is_default_for_item", calls[0])
+
+	def test_default_buffer_sync_does_not_write_standard_item_lead_time_by_default(self):
+		original_doctype_exists = stock_buffer._doctype_exists
+		original_has_field = stock_buffer._has_field
+		original_sync_enabled = stock_buffer._sync_standard_item_lead_time_enabled
+		original_db = stock_buffer.frappe.db
+		calls = []
+		buffer = frappe._dict(
+			{
+				"name": "MRP-BUF-001",
+				"active": 1,
+				"is_default_for_item": 1,
+				"item_code": "RM-001",
+				"dlt_days": 18,
+			}
+		)
+
+		try:
+			stock_buffer._doctype_exists = lambda doctype: doctype == "Item"
+			stock_buffer._has_field = lambda doctype, fieldname: doctype == "Item" and fieldname in {
+				"custom_mrp_default_stock_buffer",
+				"custom_mrp_lead_time_days",
+				"lead_time_days",
+			}
+			stock_buffer.frappe.db = frappe._dict({"set_value": lambda doctype, name, values: calls.append((doctype, name, dict(values)))})
+
+			stock_buffer._sync_standard_item_lead_time_enabled = lambda: False
+			stock_buffer.sync_default_buffer_to_item(buffer)
+			stock_buffer._sync_standard_item_lead_time_enabled = lambda: True
+			stock_buffer.sync_default_buffer_to_item(buffer)
+		finally:
+			stock_buffer._doctype_exists = original_doctype_exists
+			stock_buffer._has_field = original_has_field
+			stock_buffer._sync_standard_item_lead_time_enabled = original_sync_enabled
+			stock_buffer.frappe.db = original_db
+
+		self.assertNotIn("lead_time_days", calls[0][2])
+		self.assertEqual(calls[0][2]["custom_mrp_lead_time_days"], 18)
+		self.assertEqual(calls[1][2]["lead_time_days"], 18)
 
 	def test_order_qty_rounding_only_applies_to_purchase(self):
 		candidate = planning.RequirementCandidate(

@@ -20,6 +20,10 @@ frappe.pages["mrp-material-workbench"].on_page_load = function (wrapper) {
 		{ label: __("MR Type"), fieldname: "material_request_type", formatter: (value) => ui.code_badge(value, { tone: "blue" }) },
 		{ label: __("Supplier"), fieldname: "supplier" },
 		{ label: __("Warehouse"), fieldname: "warehouse" },
+		{ label: __("Buffer"), fieldname: "stock_buffer", formatter: (value) => (value ? ui.doc_link("MRP Stock Buffer", value) : "") },
+		{ label: __("Buffer Priority"), fieldname: "buffer_priority", formatter: (value) => ui.code_badge(value, { kind: "warning" }) },
+		{ label: __("NFP %"), fieldname: "buffer_nfp_percent", numeric: true, formatter: ui.format_number },
+		{ label: __("Buffer Recommended"), fieldname: "buffer_recommended_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("First Shortage Date"), fieldname: "first_shortage_date", formatter: ui.format_date },
 		{ label: __("Lowest Projected"), fieldname: "lowest_projected_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("Required Date"), fieldname: "required_date", formatter: ui.format_date },
@@ -145,6 +149,12 @@ frappe.pages["mrp-material-workbench"].on_page_load = function (wrapper) {
 					{ label: __("Procurement Source"), value: ui.translate(requirement.procurement_source || "") },
 					{ label: __("Procurement Constraint Summary"), value: requirement.procurement_constraint_summary || "" },
 				],
+			},
+			{
+				title: __("Stock Buffer"),
+				html: requirement.stock_buffer
+					? ui.buffer_chart_html(requirement)
+					: `<div class="ia-muted">${__("No stock buffer is linked to this requirement.")}</div>`,
 			},
 			{
 				title: __("Shortage Alerts"),

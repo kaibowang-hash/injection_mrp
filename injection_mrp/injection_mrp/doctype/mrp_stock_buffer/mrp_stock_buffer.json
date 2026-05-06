@@ -1,0 +1,494 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "autoname": "format:MRP-BUF-{#####}",
+ "creation": "2026-05-07 00:00:00.000000",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "company",
+  "item_code",
+  "item_name",
+  "stock_uom",
+  "warehouse",
+  "active",
+  "is_default_for_item",
+  "profile_section",
+  "buffer_profile",
+  "dlt_days",
+  "lead_time_factor",
+  "variability_factor",
+  "minimum_order_cycle_days",
+  "min_order_qty",
+  "order_multiple_qty",
+  "adu_section",
+  "adu_calculation_method",
+  "fixed_adu",
+  "horizon_past_days",
+  "horizon_future_days",
+  "factor_past",
+  "factor_future",
+  "adu",
+  "zone_section",
+  "red_base_qty",
+  "red_safety_qty",
+  "red_zone_qty",
+  "yellow_zone_qty",
+  "green_zone_qty",
+  "top_of_red",
+  "top_of_yellow",
+  "top_of_green",
+  "flow_section",
+  "on_hand_qty",
+  "incoming_dlt_qty",
+  "qualified_demand_qty",
+  "net_flow_position",
+  "net_flow_position_percent",
+  "planning_priority",
+  "recommended_qty",
+  "last_calculated_on",
+  "lead_time_sync_status",
+  "chart_section",
+  "buffer_summary",
+  "notes"
+ ],
+ "fields": [
+  {
+   "fieldname": "company",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Company",
+   "options": "Company",
+   "reqd": 1
+  },
+  {
+   "fieldname": "item_code",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Item",
+   "options": "Item",
+   "reqd": 1
+  },
+  {
+   "fetch_from": "item_code.item_name",
+   "fieldname": "item_name",
+   "fieldtype": "Data",
+   "label": "Item Name",
+   "read_only": 1
+  },
+  {
+   "fetch_from": "item_code.stock_uom",
+   "fieldname": "stock_uom",
+   "fieldtype": "Link",
+   "label": "Stock UOM",
+   "options": "UOM",
+   "read_only": 1
+  },
+  {
+   "fieldname": "warehouse",
+   "fieldtype": "Link",
+   "in_list_view": 1,
+   "label": "Warehouse",
+   "options": "Warehouse",
+   "reqd": 1
+  },
+  {
+   "default": "1",
+   "fieldname": "active",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Active"
+  },
+  {
+   "default": "0",
+   "fieldname": "is_default_for_item",
+   "fieldtype": "Check",
+   "in_list_view": 1,
+   "label": "Is Default for Item"
+  },
+  {
+   "fieldname": "profile_section",
+   "fieldtype": "Section Break",
+   "label": "Buffer Policy"
+  },
+  {
+   "fieldname": "buffer_profile",
+   "fieldtype": "Link",
+   "label": "Buffer Profile",
+   "options": "MRP Buffer Profile"
+  },
+  {
+   "default": "0",
+   "fieldname": "dlt_days",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "DLT Days"
+  },
+  {
+   "default": "1",
+   "fetch_from": "buffer_profile.lead_time_factor",
+   "fieldname": "lead_time_factor",
+   "fieldtype": "Float",
+   "label": "Lead Time Factor"
+  },
+  {
+   "default": "0.5",
+   "fetch_from": "buffer_profile.variability_factor",
+   "fieldname": "variability_factor",
+   "fieldtype": "Float",
+   "label": "Variability Factor"
+  },
+  {
+   "default": "0",
+   "fetch_from": "buffer_profile.default_order_cycle_days",
+   "fieldname": "minimum_order_cycle_days",
+   "fieldtype": "Float",
+   "label": "Minimum Order Cycle Days"
+  },
+  {
+   "default": "0",
+   "fieldname": "min_order_qty",
+   "fieldtype": "Float",
+   "label": "Minimum Order Qty"
+  },
+  {
+   "default": "0",
+   "fieldname": "order_multiple_qty",
+   "fieldtype": "Float",
+   "label": "Order Multiple Qty"
+  },
+  {
+   "fieldname": "adu_section",
+   "fieldtype": "Section Break",
+   "label": "ADU"
+  },
+  {
+   "default": "Fixed",
+   "fieldname": "adu_calculation_method",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "ADU Calculation Method",
+   "options": "\nFixed\nPast Actual\nFuture MRP\nBlended"
+  },
+  {
+   "default": "0",
+   "fieldname": "fixed_adu",
+   "fieldtype": "Float",
+   "label": "Fixed ADU"
+  },
+  {
+   "default": "90",
+   "fieldname": "horizon_past_days",
+   "fieldtype": "Int",
+   "label": "Past Horizon Days"
+  },
+  {
+   "default": "90",
+   "fieldname": "horizon_future_days",
+   "fieldtype": "Int",
+   "label": "Future Horizon Days"
+  },
+  {
+   "default": "0.5",
+   "fieldname": "factor_past",
+   "fieldtype": "Float",
+   "label": "Past Factor"
+  },
+  {
+   "default": "0.5",
+   "fieldname": "factor_future",
+   "fieldtype": "Float",
+   "label": "Future Factor"
+  },
+  {
+   "default": "0",
+   "fieldname": "adu",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "ADU",
+   "read_only": 1
+  },
+  {
+   "fieldname": "zone_section",
+   "fieldtype": "Section Break",
+   "label": "Buffer Zones"
+  },
+  {
+   "fieldname": "red_base_qty",
+   "fieldtype": "Float",
+   "label": "Red Base Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "red_safety_qty",
+   "fieldtype": "Float",
+   "label": "Red Safety Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "red_zone_qty",
+   "fieldtype": "Float",
+   "label": "Red Zone Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "yellow_zone_qty",
+   "fieldtype": "Float",
+   "label": "Yellow Zone Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "green_zone_qty",
+   "fieldtype": "Float",
+   "label": "Green Zone Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "top_of_red",
+   "fieldtype": "Float",
+   "label": "Top of Red",
+   "read_only": 1
+  },
+  {
+   "fieldname": "top_of_yellow",
+   "fieldtype": "Float",
+   "label": "Top of Yellow",
+   "read_only": 1
+  },
+  {
+   "fieldname": "top_of_green",
+   "fieldtype": "Float",
+   "label": "Top of Green",
+   "read_only": 1
+  },
+  {
+   "fieldname": "flow_section",
+   "fieldtype": "Section Break",
+   "label": "Net Flow"
+  },
+  {
+   "fieldname": "on_hand_qty",
+   "fieldtype": "Float",
+   "label": "On Hand Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "incoming_dlt_qty",
+   "fieldtype": "Float",
+   "label": "Incoming DLT Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "qualified_demand_qty",
+   "fieldtype": "Float",
+   "label": "Qualified Demand Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_flow_position",
+   "fieldtype": "Float",
+   "label": "Net Flow Position",
+   "read_only": 1
+  },
+  {
+   "fieldname": "net_flow_position_percent",
+   "fieldtype": "Percent",
+   "in_list_view": 1,
+   "label": "Net Flow Position %",
+   "read_only": 1
+  },
+  {
+   "fieldname": "planning_priority",
+   "fieldtype": "Select",
+   "in_list_view": 1,
+   "label": "Planning Priority",
+   "options": "\nRed\nYellow\nGreen",
+   "read_only": 1
+  },
+  {
+   "fieldname": "recommended_qty",
+   "fieldtype": "Float",
+   "in_list_view": 1,
+   "label": "Recommended Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "last_calculated_on",
+   "fieldtype": "Datetime",
+   "label": "Last Calculated On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "lead_time_sync_status",
+   "fieldtype": "Small Text",
+   "label": "Lead Time Sync Status",
+   "read_only": 1
+  },
+  {
+   "fieldname": "chart_section",
+   "fieldtype": "Section Break",
+   "label": "Buffer Summary"
+  },
+  {
+   "fieldname": "buffer_summary",
+   "fieldtype": "HTML",
+   "label": "Buffer Summary",
+   "read_only": 1
+  },
+  {
+   "fieldname": "notes",
+   "fieldtype": "Small Text",
+   "label": "Notes"
+  }
+ ],
+ "links": [],
+ "modified": "2026-05-07 00:00:00.000000",
+ "module": "Injection MRP",
+ "name": "MRP Stock Buffer",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "MPLM",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "create": 1,
+   "email": 1,
+   "export": 1,
+   "import": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "MPLP",
+   "select": 1,
+   "share": 1,
+   "write": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "PMC",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "GMC",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase Manager",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Purchase User",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing Manager",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Manufacturing User",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock Manager",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Stock User",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales Manager",
+   "select": 1,
+   "share": 1
+  },
+  {
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "Sales User",
+   "select": 1,
+   "share": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}

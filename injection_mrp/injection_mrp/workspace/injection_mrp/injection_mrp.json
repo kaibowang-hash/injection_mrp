@@ -108,7 +108,7 @@
   },
   {
    "label": "Configuration",
-   "link_count": 2,
+   "link_count": 4,
    "link_type": "DocType",
    "type": "Card Break"
   },
@@ -121,6 +121,18 @@
   {
    "label": "MRP Supply Rule",
    "link_to": "MRP Supply Rule",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Buffer Profile",
+   "link_to": "MRP Buffer Profile",
+   "link_type": "DocType",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Stock Buffer",
+   "link_to": "MRP Stock Buffer",
    "link_type": "DocType",
    "type": "Link"
   }

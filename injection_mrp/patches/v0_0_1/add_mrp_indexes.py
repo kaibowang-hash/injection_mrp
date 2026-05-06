@@ -32,6 +32,10 @@ INDEXES = {
 	"MRP Supply Rule": [
 		("imrp_rule_match", ["enabled", "company", "item_code", "item_group", "customer", "warehouse"]),
 	],
+	"MRP Stock Buffer": [
+		("imrp_buffer_item_wh", ["active", "company", "item_code", "warehouse"]),
+		("imrp_buffer_default_item", ["active", "company", "item_code", "is_default_for_item"]),
+	],
 }
 
 

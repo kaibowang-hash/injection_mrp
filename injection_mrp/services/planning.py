@@ -11,6 +11,8 @@ import frappe
 from frappe import _
 from frappe.utils import add_days, cint, date_diff, flt, getdate, now_datetime, today
 
+from injection_mrp.services import stock_buffer
+
 
 FIRM_APS_STATUSES = ("Approved", "Work Order Proposed", "Shift Proposed", "Applied")
 OPEN_DOC_STATUSES = ("Closed", "Stopped", "Cancelled")
@@ -89,6 +91,14 @@ class RequirementCandidate:
 	procurement_source: str | None = None
 	procurement_constraint_summary: str | None = None
 	missing_bom: int = 0
+	stock_buffer: str | None = None
+	buffer_priority: str | None = None
+	buffer_nfp_percent: float = 0
+	buffer_recommended_qty: float = 0
+	buffer_top_of_red: float = 0
+	buffer_top_of_yellow: float = 0
+	buffer_top_of_green: float = 0
+	buffer_lead_time_days: int = 0
 
 
 @dataclass
@@ -137,6 +147,12 @@ def get_settings_dict() -> frappe._dict:
 			"early_supply_warning_days": cint(settings.early_supply_warning_days) or 7,
 			"late_supply_tolerance_days": cint(settings.late_supply_tolerance_days) or 0,
 			"warn_missing_lead_time": cint(settings.warn_missing_lead_time),
+			"use_stock_buffer_for_safety_stock": (
+				1
+				if settings.get("use_stock_buffer_for_safety_stock") is None
+				else cint(settings.get("use_stock_buffer_for_safety_stock"))
+			),
+			"sync_buffer_dlt_to_item_lead_time": cint(settings.get("sync_buffer_dlt_to_item_lead_time")),
 			"use_material_need_date_for_pegging": cint(settings.use_material_need_date_for_pegging),
 			"rolling_daily_horizon_days": cint(settings.get("rolling_daily_horizon_days")) or 60,
 			"allow_prebuy_material_request": cint(settings.allow_prebuy_material_request),
@@ -634,6 +650,14 @@ def get_material_workbench_data(
 			"suggested_order_date",
 			"expected_arrival_date",
 			"delivery_variance_days",
+			"stock_buffer",
+			"buffer_priority",
+			"buffer_nfp_percent",
+			"buffer_recommended_qty",
+			"buffer_top_of_red",
+			"buffer_top_of_yellow",
+			"buffer_top_of_green",
+			"buffer_lead_time_days",
 			"warning_count",
 			"adjustment_summary",
 			"warning_summary",
@@ -1559,7 +1583,7 @@ def _collect_demands(run, settings) -> list[DemandRow]:
 	sales_order_demands = _filter_valid_demands(run, _collect_sales_order_demands(run))
 	demands.extend(_consume_forecast_with_sales_orders(forecast_demands, sales_order_demands, settings))
 	demands.extend(sales_order_demands)
-	demands.extend(_filter_valid_demands(run, _collect_safety_stock_demands(run)))
+	demands.extend(_filter_valid_demands(run, _collect_safety_stock_demands(run, settings)))
 	if settings.include_production_plan_as_demand:
 		demands.extend(_filter_valid_demands(run, _collect_production_plan_demands(run)))
 	return _filter_forecast_fence_demands(run, settings, _dedupe_demands(demands))
@@ -1714,7 +1738,34 @@ def _collect_sales_order_demands(run) -> list[DemandRow]:
 	return demands
 
 
-def _collect_safety_stock_demands(run) -> list[DemandRow]:
+def _collect_safety_stock_demands(run, settings=None) -> list[DemandRow]:
+	demands = []
+	use_buffer = cint((settings or {}).get("use_stock_buffer_for_safety_stock", 1)) if hasattr(settings or {}, "get") else 1
+	if use_buffer:
+		for buffer in stock_buffer.collect_buffer_top_up_demands(run, persist=False):
+			demands.append(
+				DemandRow(
+					demand_type="Stock Buffer",
+					item_code=buffer.item_code,
+					qty=buffer.recommended_qty,
+					required_date=run.horizon_start,
+					company=run.company,
+					warehouse=buffer.warehouse,
+					source_doctype="MRP Stock Buffer",
+					source_name=buffer.name,
+					notes=_("Stock buffer top-up demand. Priority: {0}, NFP: {1}%").format(
+						buffer.planning_priority,
+						buffer.net_flow_position_percent,
+					),
+				)
+			)
+		demands.extend(_collect_item_safety_stock_demands(run, skip_buffered_items=True))
+	else:
+		demands.extend(_collect_item_safety_stock_demands(run, skip_buffered_items=False))
+	return demands
+
+
+def _collect_item_safety_stock_demands(run, skip_buffered_items: bool = True) -> list[DemandRow]:
 	if not _doctype_exists("Item") or not _has_field("Item", "safety_stock"):
 		return []
 
@@ -1728,6 +1779,8 @@ def _collect_safety_stock_demands(run) -> list[DemandRow]:
 	demands = []
 	for item in items:
 		warehouse = run.warehouse or item.get("default_warehouse")
+		if skip_buffered_items and stock_buffer.get_buffer_name_for_item(item.name, run.company, warehouse):
+			continue
 		available = _get_available_qty(item.name, run.company, warehouse)
 		shortage = max(flt(item.safety_stock) - available, 0)
 		if shortage <= 0:
@@ -2491,8 +2544,31 @@ def _apply_procurement_to_candidate(candidate: RequirementCandidate, procurement
 	candidate.procurement_source = procurement.procurement_source
 
 
+def _apply_buffer_to_candidate(candidate: RequirementCandidate, run) -> frappe._dict | None:
+	state = stock_buffer.get_buffer_state_for_item(candidate.item_code, run.company, candidate.warehouse, run=run, persist=False)
+	if not state:
+		return None
+	candidate.stock_buffer = state.name
+	candidate.buffer_priority = state.planning_priority
+	candidate.buffer_nfp_percent = flt(state.net_flow_position_percent)
+	candidate.buffer_recommended_qty = flt(state.recommended_qty)
+	candidate.buffer_top_of_red = flt(state.top_of_red)
+	candidate.buffer_top_of_yellow = flt(state.top_of_yellow)
+	candidate.buffer_top_of_green = flt(state.top_of_green)
+	candidate.buffer_lead_time_days = cint(state.get("dlt_days") or state.get("buffer_lead_time_days") or 0)
+	if state.get("dlt_days") is None:
+		candidate.buffer_lead_time_days = cint(
+			frappe.db.get_value("MRP Stock Buffer", state.name, "dlt_days") if state.name else 0
+		)
+	if flt(state.get("min_order_qty")) > 0:
+		candidate.min_order_qty = flt(state.min_order_qty)
+	if flt(state.get("order_multiple_qty")) > 0:
+		candidate.order_multiple_qty = flt(state.order_multiple_qty)
+	return state
+
+
 def _get_candidate_lead_time(candidate: RequirementCandidate):
-	return cint(candidate.supplier_lead_time_days) or _get_item_lead_time(candidate.item_code)
+	return cint(candidate.buffer_lead_time_days) or cint(candidate.supplier_lead_time_days) or _get_item_lead_time(candidate.item_code)
 
 
 def _get_planned_order_qty(required_qty: float, candidate: RequirementCandidate) -> float:
@@ -2556,6 +2632,7 @@ def _insert_requirement_line(run, settings, candidate: RequirementCandidate, sup
 	material_need_date = _get_material_need_date(candidate.required_date or run.horizon_start, settings)
 	procurement = _resolve_procurement_constraints(candidate, run.company, material_need_date)
 	_apply_procurement_to_candidate(candidate, procurement)
+	buffer_state = _apply_buffer_to_candidate(candidate, run)
 	lead_time = _get_candidate_lead_time(candidate)
 	suggested_order_date = _get_suggested_order_date(material_need_date, lead_time)
 	if candidate.supply_mode in {"Supplier Supplied", "No Action"}:
@@ -2566,6 +2643,29 @@ def _insert_requirement_line(run, settings, candidate: RequirementCandidate, sup
 		remaining = max(gross - sum(flt(row["supply_qty"]) for row in allocations), 0)
 
 	warnings: list[dict[str, Any]] = []
+	if (
+		buffer_state
+		and cint(candidate.buffer_lead_time_days) > 0
+		and cint(candidate.supplier_lead_time_days)
+		and cint(candidate.supplier_lead_time_days) != cint(candidate.buffer_lead_time_days)
+	):
+		warnings.append(
+			{
+				"category": "Lead Time Source Mismatch",
+				"level": "Info",
+				"reason": _(
+					"Supplier lead time {0} day(s) differs from Stock Buffer DLT {1} day(s); MRP used the Stock Buffer value."
+				).format(candidate.supplier_lead_time_days, candidate.buffer_lead_time_days),
+			}
+		)
+	elif buffer_state and cint(candidate.buffer_lead_time_days) <= 0 and lead_time > 0:
+		warnings.append(
+			{
+				"category": "Lead Time Source Fallback",
+				"level": "Info",
+				"reason": _("Stock Buffer DLT is empty; MRP used supplier or item lead time."),
+			}
+		)
 	if candidate.supply_mode not in {"Supplier Supplied", "No Action"} and settings.warn_missing_lead_time and lead_time <= 0:
 		warnings.append(
 			{
@@ -2624,23 +2724,31 @@ def _insert_requirement_line(run, settings, candidate: RequirementCandidate, sup
 			"status": status,
 			"requirement_type": candidate.requirement_type,
 			"commitment_type": commitment_type,
-			"supply_mode": candidate.supply_mode,
-			"material_request_type": candidate.material_request_type,
-			"item_code": candidate.item_code,
-			"item_name": candidate.item_name,
-			"uom": candidate.uom,
-			"warehouse": candidate.warehouse,
-			"source_warehouse": candidate.source_warehouse,
-			"supplier": candidate.supplier,
-			"supplier_lead_time_days": candidate.supplier_lead_time_days,
-			"customer": candidate.customer,
-			"required_date": candidate.required_date,
-			"material_need_date": material_need_date,
-			"suggested_order_date": suggested_order_date,
-			"expected_arrival_date": expected_arrival_date,
-			"lead_time_days": lead_time,
-			"delivery_variance_days": delivery_variance_days,
-			"demand_item_code": candidate.demand_item_code,
+				"supply_mode": candidate.supply_mode,
+				"material_request_type": candidate.material_request_type,
+				"item_code": candidate.item_code,
+				"item_name": candidate.item_name,
+				"uom": candidate.uom,
+				"warehouse": candidate.warehouse,
+				"source_warehouse": candidate.source_warehouse,
+				"supplier": candidate.supplier,
+				"supplier_lead_time_days": candidate.supplier_lead_time_days,
+				"customer": candidate.customer,
+				"required_date": candidate.required_date,
+				"material_need_date": material_need_date,
+				"suggested_order_date": suggested_order_date,
+				"expected_arrival_date": expected_arrival_date,
+				"lead_time_days": lead_time,
+				"delivery_variance_days": delivery_variance_days,
+				"stock_buffer": candidate.stock_buffer,
+				"buffer_priority": candidate.buffer_priority,
+				"buffer_nfp_percent": candidate.buffer_nfp_percent,
+				"buffer_recommended_qty": candidate.buffer_recommended_qty,
+				"buffer_top_of_red": candidate.buffer_top_of_red,
+				"buffer_top_of_yellow": candidate.buffer_top_of_yellow,
+				"buffer_top_of_green": candidate.buffer_top_of_green,
+				"buffer_lead_time_days": candidate.buffer_lead_time_days,
+				"demand_item_code": candidate.demand_item_code,
 			"bom": candidate.bom,
 			"bom_item": candidate.bom_item,
 			"bom_level": candidate.bom_level,
@@ -2952,133 +3060,133 @@ def _get_excess_supply_reason(run, supply: SupplyRecord) -> str:
 
 
 def _calculate_rolling_availability(run, settings, requirements: list[Any], batch=None) -> dict[str, Any]:
-	if not _doctype_exists("MRP Rolling Balance Line") or not _doctype_exists("MRP Shortage Alert"):
-		return {"shortage_alert_count": 0}
+    if not _doctype_exists("MRP Rolling Balance Line") or not _doctype_exists("MRP Shortage Alert"):
+        return {"shortage_alert_count": 0}
 
-	grouped: dict[tuple[str, str | None], list[Any]] = defaultdict(list)
-	for line in requirements:
-		if line.supply_mode in {"Supplier Supplied", "No Action"}:
-			continue
-		grouped[(line.item_code, line.warehouse)].append(line)
+    grouped: dict[tuple[str, str | None], list[Any]] = defaultdict(list)
+    for line in requirements:
+        if line.supply_mode in {"Supplier Supplied", "No Action"}:
+            continue
+        grouped[(line.item_code, line.warehouse)].append(line)
 
-	alert_count = 0
-	for (item_code, warehouse), lines in grouped.items():
-		item = _get_item_values(item_code)
-		buckets = _make_rolling_buckets(run.horizon_start, run.horizon_end, settings.rolling_daily_horizon_days)
-		demand_events = [
-			{
-				"date": getdate(line.material_need_date or line.required_date or run.horizon_start),
-				"qty": flt(line.gross_qty),
-				"requirement_line": line.name,
-				"demand_snapshot": line.demand_snapshot,
-			}
-			for line in lines
-			if flt(line.gross_qty) > 0
-		]
-		supply_events = []
-		planned_events = []
-		for supply in _get_supply_records(item_code, run.company, warehouse, settings, run):
-			if supply.supply_type == "Stock":
-				continue
-			supply_events.append(
-				{
-					"date": getdate(supply.expected_arrival_date or supply.supply_date or run.horizon_start),
-					"qty": flt(supply.remaining_qty),
-					"supply_type": supply.supply_type,
-					"supply_doctype": supply.source_doctype,
-					"supply_name": supply.source_name,
-				}
-			)
-		for line in lines:
-			if flt(line.new_supply_qty) <= 0 or line.supply_mode not in SUPPLY_MODES_REQUIRING_MR:
-				continue
-			planned_events.append(
-				{
-					"date": getdate(line.expected_arrival_date or line.material_need_date or line.required_date or run.horizon_start),
-					"qty": flt(line.new_supply_qty),
-					"supply_type": "Planned Supply",
-					"requirement_line": line.name,
-				}
-			)
+    alert_count = 0
+    for (item_code, warehouse), lines in grouped.items():
+        item = _get_item_values(item_code)
+        buckets = _make_rolling_buckets(run.horizon_start, run.horizon_end, settings.rolling_daily_horizon_days)
+        demand_events = [
+            {
+                "date": getdate(line.material_need_date or line.required_date or run.horizon_start),
+                "qty": flt(line.gross_qty),
+                "requirement_line": line.name,
+                "demand_snapshot": line.demand_snapshot,
+            }
+            for line in lines
+            if flt(line.gross_qty) > 0
+        ]
+        supply_events = []
+        planned_events = []
+        for supply in _get_supply_records(item_code, run.company, warehouse, settings, run):
+            if supply.supply_type == "Stock":
+                continue
+            supply_events.append(
+                {
+                    "date": getdate(supply.expected_arrival_date or supply.supply_date or run.horizon_start),
+                    "qty": flt(supply.remaining_qty),
+                    "supply_type": supply.supply_type,
+                    "supply_doctype": supply.source_doctype,
+                    "supply_name": supply.source_name,
+                }
+            )
+        for line in lines:
+            if flt(line.new_supply_qty) <= 0 or line.supply_mode not in SUPPLY_MODES_REQUIRING_MR:
+                continue
+            planned_events.append(
+                {
+                    "date": getdate(line.expected_arrival_date or line.material_need_date or line.required_date or run.horizon_start),
+                    "qty": flt(line.new_supply_qty),
+                    "supply_type": "Planned Supply",
+                    "requirement_line": line.name,
+                }
+            )
 
-		projected = _get_available_qty(item_code, run.company, warehouse)
-		safety_stock = _get_item_safety_stock(item_code)
-		lowest_projected = projected
-		first_hard_shortage = None
-		first_safety_gap = None
-		hard_shortage_qty = 0
-		safety_gap_qty = 0
-		rolling_rows = []
-		for bucket in buckets:
-			bucket_demand = _events_in_bucket(demand_events, bucket)
-			bucket_supply = _events_in_bucket(supply_events, bucket)
-			bucket_planned = _events_in_bucket(planned_events, bucket)
-			demand_qty = sum(flt(row["qty"]) for row in bucket_demand)
-			supply_qty = sum(flt(row["qty"]) for row in bucket_supply)
-			planned_qty = sum(flt(row["qty"]) for row in bucket_planned)
-			opening_qty = projected
-			projected = opening_qty + supply_qty + planned_qty - demand_qty
-			lowest_projected = min(lowest_projected, projected)
-			shortage_qty = max(-projected, 0)
-			gap_qty = max(flt(safety_stock) - projected, 0)
-			if shortage_qty > 0 and not first_hard_shortage:
-				first_hard_shortage = bucket["start"]
-				hard_shortage_qty = shortage_qty
-			if gap_qty > 0 and not first_safety_gap:
-				first_safety_gap = bucket["start"]
-				safety_gap_qty = gap_qty
-			rolling_rows.append(
-				{
-					"mrp_run": run.name,
-					"company": run.company,
-					"item_code": item_code,
-					"item_name": item.get("item_name"),
-					"warehouse": warehouse,
-					"bucket_type": bucket["type"],
-					"bucket_start": bucket["start"],
-					"bucket_end": bucket["end"],
-					"opening_qty": opening_qty,
-					"demand_qty": demand_qty,
-					"supply_qty": supply_qty,
-					"planned_supply_qty": planned_qty,
-					"projected_qty": projected,
-					"safety_stock_qty": safety_stock,
-					"shortage_qty": shortage_qty,
-					"safety_stock_gap_qty": gap_qty,
-					"warning_level": "Critical" if shortage_qty > 0 else ("Warning" if gap_qty > 0 else "None"),
-					"demand_trace": _dumps(bucket_demand),
-					"supply_trace": _dumps(bucket_supply + bucket_planned),
-				}
-			)
-		_bulk_insert_records("MRP Rolling Balance Line", rolling_rows)
+        projected = _get_available_qty(item_code, run.company, warehouse)
+        safety_stock = _get_buffer_warning_qty(item_code, run.company, warehouse, run)
+        lowest_projected = projected
+        first_hard_shortage = None
+        first_safety_gap = None
+        hard_shortage_qty = 0
+        safety_gap_qty = 0
+        rolling_rows = []
+        for bucket in buckets:
+            bucket_demand = _events_in_bucket(demand_events, bucket)
+            bucket_supply = _events_in_bucket(supply_events, bucket)
+            bucket_planned = _events_in_bucket(planned_events, bucket)
+            demand_qty = sum(flt(row["qty"]) for row in bucket_demand)
+            supply_qty = sum(flt(row["qty"]) for row in bucket_supply)
+            planned_qty = sum(flt(row["qty"]) for row in bucket_planned)
+            opening_qty = projected
+            projected = opening_qty + supply_qty + planned_qty - demand_qty
+            lowest_projected = min(lowest_projected, projected)
+            shortage_qty = max(-projected, 0)
+            gap_qty = max(flt(safety_stock) - projected, 0)
+            if shortage_qty > 0 and not first_hard_shortage:
+                first_hard_shortage = bucket["start"]
+                hard_shortage_qty = shortage_qty
+            if gap_qty > 0 and not first_safety_gap:
+                first_safety_gap = bucket["start"]
+                safety_gap_qty = gap_qty
+            rolling_rows.append(
+                {
+                    "mrp_run": run.name,
+                    "company": run.company,
+                    "item_code": item_code,
+                    "item_name": item.get("item_name"),
+                    "warehouse": warehouse,
+                    "bucket_type": bucket["type"],
+                    "bucket_start": bucket["start"],
+                    "bucket_end": bucket["end"],
+                    "opening_qty": opening_qty,
+                    "demand_qty": demand_qty,
+                    "supply_qty": supply_qty,
+                    "planned_supply_qty": planned_qty,
+                    "projected_qty": projected,
+                    "safety_stock_qty": safety_stock,
+                    "shortage_qty": shortage_qty,
+                    "safety_stock_gap_qty": gap_qty,
+                    "warning_level": "Critical" if shortage_qty > 0 else ("Warning" if gap_qty > 0 else "None"),
+                    "demand_trace": _dumps(bucket_demand),
+                    "supply_trace": _dumps(bucket_supply + bucket_planned),
+                }
+            )
+        _bulk_insert_records("MRP Rolling Balance Line", rolling_rows)
 
-		alert_date = first_hard_shortage or first_safety_gap
-		if alert_date:
-			alert_count += 1
-			affected = [row for row in demand_events if getdate(row["date"]) <= getdate(alert_date)]
-			frappe.get_doc(
-				{
-					"doctype": "MRP Shortage Alert",
-					"mrp_run": run.name,
-					"company": run.company,
-					"item_code": item_code,
-					"item_name": item.get("item_name"),
-					"warehouse": warehouse,
-					"warning_level": "Critical" if first_hard_shortage else "Warning",
-					"status": "Open",
-					"first_shortage_date": alert_date,
-					"shortage_qty": hard_shortage_qty,
-					"lowest_projected_qty": lowest_projected,
-					"safety_stock_qty": safety_stock,
-					"safety_stock_gap_qty": safety_gap_qty,
-					"latest_order_date": add_days(alert_date, -_get_item_lead_time(item_code)),
-					"affected_requirement_count": len(affected),
-					"affected_requirements": _dumps(affected[:50]),
-				}
-			).insert(ignore_permissions=True)
-			_update_requirement_shortage_summary(lines, alert_date, lowest_projected)
+        alert_date = first_hard_shortage or first_safety_gap
+        if alert_date:
+            alert_count += 1
+            affected = [row for row in demand_events if getdate(row["date"]) <= getdate(alert_date)]
+            frappe.get_doc(
+                {
+                    "doctype": "MRP Shortage Alert",
+                    "mrp_run": run.name,
+                    "company": run.company,
+                    "item_code": item_code,
+                    "item_name": item.get("item_name"),
+                    "warehouse": warehouse,
+                    "warning_level": "Critical" if first_hard_shortage else "Warning",
+                    "status": "Open",
+                    "first_shortage_date": alert_date,
+                    "shortage_qty": hard_shortage_qty,
+                    "lowest_projected_qty": lowest_projected,
+                    "safety_stock_qty": safety_stock,
+                    "safety_stock_gap_qty": safety_gap_qty,
+                    "latest_order_date": add_days(alert_date, -_get_buffer_lead_time(item_code, run.company, warehouse, run)),
+                    "affected_requirement_count": len(affected),
+                    "affected_requirements": _dumps(affected[:50]),
+                }
+            ).insert(ignore_permissions=True)
+            _update_requirement_shortage_summary(lines, alert_date, lowest_projected)
 
-	return {"shortage_alert_count": alert_count}
+    return {"shortage_alert_count": alert_count}
 
 
 def _make_rolling_buckets(horizon_start, horizon_end, daily_days):
@@ -3110,6 +3218,20 @@ def _get_item_safety_stock(item_code):
 	if _has_field("Item", "safety_stock"):
 		return flt(frappe.db.get_value("Item", item_code, "safety_stock"))
 	return 0
+
+
+def _get_buffer_warning_qty(item_code, company, warehouse, run=None):
+	state = stock_buffer.get_buffer_state_for_item(item_code, company, warehouse, run=run, persist=False)
+	if state:
+		return flt(state.top_of_red)
+	return _get_item_safety_stock(item_code)
+
+
+def _get_buffer_lead_time(item_code, company, warehouse, run=None):
+	state = stock_buffer.get_buffer_state_for_item(item_code, company, warehouse, run=run, persist=False)
+	if state and cint(state.dlt_days) > 0:
+		return cint(state.dlt_days)
+	return _get_item_lead_time(item_code)
 
 
 def _update_requirement_shortage_summary(lines, first_shortage_date, lowest_projected):
@@ -3298,6 +3420,14 @@ def _create_proposal_batch(run, settings, requirements: list[Any]):
 					"supply_mode": line.supply_mode,
 					"customer": line.customer,
 					"supplier": line.supplier,
+					"stock_buffer": line.stock_buffer,
+					"buffer_priority": line.buffer_priority,
+					"buffer_nfp_percent": line.buffer_nfp_percent,
+					"buffer_recommended_qty": line.buffer_recommended_qty,
+					"buffer_top_of_red": line.buffer_top_of_red,
+					"buffer_top_of_yellow": line.buffer_top_of_yellow,
+					"buffer_top_of_green": line.buffer_top_of_green,
+					"buffer_lead_time_days": line.buffer_lead_time_days,
 					"commitment_type": "Prebuy",
 					"action": "Consume Prebuy",
 					"status": "Pending",
@@ -3328,6 +3458,14 @@ def _create_proposal_batch(run, settings, requirements: list[Any]):
 					"min_order_qty": line.min_order_qty,
 					"order_multiple_qty": line.order_multiple_qty,
 					"order_excess_qty": line.order_excess_qty,
+					"stock_buffer": line.stock_buffer,
+					"buffer_priority": line.buffer_priority,
+					"buffer_nfp_percent": line.buffer_nfp_percent,
+					"buffer_recommended_qty": line.buffer_recommended_qty,
+					"buffer_top_of_red": line.buffer_top_of_red,
+					"buffer_top_of_yellow": line.buffer_top_of_yellow,
+					"buffer_top_of_green": line.buffer_top_of_green,
+					"buffer_lead_time_days": line.buffer_lead_time_days,
 					"supplier_quotation": line.supplier_quotation,
 					"item_price": line.item_price,
 					"estimated_rate": line.estimated_rate,
@@ -4180,6 +4318,8 @@ def _get_item_values_cached(item_code):
 	for fieldname in (
 		"default_warehouse",
 		"lead_time_days",
+		"custom_mrp_lead_time_days",
+		"custom_mrp_default_stock_buffer",
 		"purchase_uom",
 		"min_order_qty",
 		"is_purchase_item",
@@ -4498,6 +4638,10 @@ def _requires_bom_for_item(item_code) -> bool:
 
 @lru_cache(maxsize=10000)
 def _get_item_lead_time(item_code):
+	if _has_field("Item", "custom_mrp_lead_time_days"):
+		mrp_lead_time = cint(frappe.db.get_value("Item", item_code, "custom_mrp_lead_time_days"))
+		if mrp_lead_time:
+			return mrp_lead_time
 	if _has_field("Item", "lead_time_days"):
 		return cint(frappe.db.get_value("Item", item_code, "lead_time_days"))
 	if _has_field("Item", "lead_time"):
@@ -4630,6 +4774,7 @@ def _clear_planning_caches():
 		_get_item_safety_stock,
 	):
 		func.cache_clear()
+	stock_buffer.clear_runtime_cache()
 
 
 def _dumps(value: Any) -> str:

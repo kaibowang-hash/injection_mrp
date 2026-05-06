@@ -8,6 +8,7 @@ from frappe.utils import now_datetime
 from frappe.utils.xlsxutils import make_xlsx
 
 from injection_mrp.services import planning
+from injection_mrp.services import stock_buffer
 
 
 READ_ROLES = {
@@ -178,6 +179,47 @@ def get_requirement_detail(requirement_line):
 
 
 @frappe.whitelist()
+def get_stock_buffer_chart_data(buffer_name=None, item_code=None, company=None, warehouse=None):
+	_require_any_role(READ_ROLES)
+	if buffer_name:
+		_require_doc_permission("MRP Stock Buffer", buffer_name, "read")
+		return stock_buffer.get_chart_data(buffer_name=buffer_name)
+	resolved_buffer = stock_buffer.get_buffer_name_for_item(item_code or "", company, warehouse)
+	if not resolved_buffer:
+		return frappe._dict()
+	_require_doc_permission("MRP Stock Buffer", resolved_buffer, "read")
+	return stock_buffer.get_chart_data(buffer_name=resolved_buffer)
+
+
+@frappe.whitelist()
+def refresh_stock_buffer(buffer_name):
+	_require_any_role(PLAN_ROLES)
+	doc = _require_doc_permission("MRP Stock Buffer", buffer_name, "write")
+	return stock_buffer.refresh_buffer(doc, persist=True)
+
+
+@frappe.whitelist()
+def recalculate_stock_buffers(company=None, item_code=None, warehouse=None):
+	_require_any_role(PLAN_ROLES)
+	filters = {"active": 1}
+	if company:
+		filters["company"] = company
+	if item_code:
+		filters["item_code"] = item_code
+	if warehouse:
+		filters["warehouse"] = warehouse
+	rows = frappe.get_all("MRP Stock Buffer", filters=filters, fields=["name"], limit_page_length=10000)
+	buffers = []
+	for row in rows:
+		doc = _require_doc_permission("MRP Stock Buffer", row.name, "write")
+		buffers.append(stock_buffer.refresh_buffer(doc, persist=True))
+	return {
+		"count": len(rows),
+		"buffers": buffers,
+	}
+
+
+@frappe.whitelist()
 def get_batch_detail(batch_name):
 	_require_any_role(READ_ROLES)
 	return planning.get_batch_detail(batch_name)
@@ -257,6 +299,14 @@ def _require_any_role(roles):
 	user_roles = set(frappe.get_roles(frappe.session.user))
 	if not user_roles.intersection(roles):
 		frappe.throw(_("Not permitted for Injection MRP."), frappe.PermissionError)
+
+
+def _require_doc_permission(doctype, name, permission_type="read"):
+	if not name:
+		frappe.throw(_("Missing document name."), frappe.PermissionError)
+	doc = frappe.get_doc(doctype, name)
+	doc.check_permission(permission_type)
+	return doc
 
 
 def _make_xlsx_compat(data, sheet_name, column_widths=None, header_index=None):

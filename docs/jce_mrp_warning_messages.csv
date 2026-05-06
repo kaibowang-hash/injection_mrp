@@ -1,0 +1,17 @@
+Warning Message,释义
+"Item has no lead time. Please maintain Item Lead Time Days for more reliable MRP.",Missing Lead Time：物料没有维护前置时间，系统仍会计算需求，但建议下单日期和预计到货日期的可靠性会下降。
+"Suggested order date is before today. Procurement is already behind the material need date.",Past Due Order：按物料需求日期和前置时间倒推后，建议下单日已经早于今天，说明采购/生产启动已经滞后。
+"Expected arrival is {0} day(s) after the material need date.",Late Supply：现有供应预计到货晚于物料需求日期 {0} 天，需要催交、提前或补充新供应。
+"Expected arrival is {0} day(s) before the material need date.",Early Supply：现有供应预计到货早于物料需求日期 {0} 天，可能造成提前占库或资金占用，需要考虑延后。
+"Existing supply is not consumed by demand in this MRP run. Please review whether it should be delayed, cancelled, or kept.",Excess Supply：本次 MRP 中某笔已有供应没有被需求消耗，需要人工判断保留、延后还是取消。
+"Forecast prebuy supply remains after firm APS consumption. Please review whether to keep, delay, cancel, or reassign it.",Excess Prebuy：APS 确认需求冲销预测预采后仍有剩余预采，需要复核是否保留、延后、取消或转给其他需求。
+"No submitted active BOM was found for an item that is planned as manufacture or subcontracting.",Missing BOM：制造或外协物料没有可用的已提交且启用 BOM，系统无法展开下阶物料，需求会保留在原物料层级。
+"No supplier was selected for this purchase suggestion.",Missing Supplier：采购建议没有匹配到供应商，释放前应维护 Item Supplier、供应规则或人工指定供应商。
+"Suggested order quantity was rounded from {0} to {1} by MOQ or order multiple.",Purchase Constraint Rounding：建议下单数量因最低采购量或下单倍量从 {0} 向上取整到 {1}，可能形成超额建议量。
+"Supplier lead time {0} day(s) differs from Stock Buffer DLT {1} day(s); MRP used the Stock Buffer value.",Lead Time Source Mismatch：供应商前置时间与库存缓冲 DLT 不一致，本次 MRP 优先使用库存缓冲 DLT 倒推建议下单日期。
+"Stock Buffer DLT is empty; MRP used supplier or item lead time.",Lead Time Source Fallback：库存缓冲未维护 DLT，系统回退使用供应商或物料前置时间，建议补充缓冲 DLT 以提升排程一致性。
+"APS planned quantity is {0}, but only scheduled quantity {1} is firm enough for MRP.",Unscheduled APS Quantity：APS 计划数量为 {0}，但只有已排程数量 {1} 被认为足够确认，MRP 只会使用 firm 的已排程部分。
+"Requirement line was not found; live shortage cannot be revalidated.",Missing Requirement：释放校验时找不到原需求明细，无法重新核对实时缺口；这通常表示建议来源已被删除、覆盖或数据不同步。
+"Current shortage {0} is higher than proposal qty {1}; this batch may not cover the full demand.",Increased Shortage：释放前实时缺口 {0} 已高于建议数量 {1}，当前建议批次可能不能覆盖全部需求，需要重新运行或补充建议。
+"Release validation has warnings.",Release Validation Warning Fallback：释放校验存在预警但没有具体预警消息时使用的兜底提示。
+"Valid with {0} warning(s). {1}",Release Validation Warning Summary：释放校验没有阻塞错误，但存在 {0} 个预警；系统会展示第一条预警 {1}，建议处理或确认后再应用。

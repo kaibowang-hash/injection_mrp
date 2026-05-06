@@ -16,11 +16,12 @@ MRP_TRANSACTION_DOCTYPES = (
 	"MRP Shortage Alert",
 	"MRP Proposal Batch",
 	"MRP Exception Log",
+	"MRP Stock Buffer",
 )
 
 
 def ensure_standard_customizations():
-	create_custom_fields(STANDARD_CUSTOM_FIELDS, update=True)
+	create_custom_fields(_standard_custom_fields_for_site(), update=True)
 	frappe.clear_cache()
 
 
@@ -36,6 +37,18 @@ def ensure_default_settings():
 	settings.warn_missing_lead_time = (
 		1 if settings.warn_missing_lead_time is None else settings.warn_missing_lead_time
 	)
+	if settings.meta.has_field("use_stock_buffer_for_safety_stock"):
+		settings.use_stock_buffer_for_safety_stock = (
+			1
+			if settings.use_stock_buffer_for_safety_stock is None
+			else settings.use_stock_buffer_for_safety_stock
+		)
+	if settings.meta.has_field("sync_buffer_dlt_to_item_lead_time"):
+		settings.sync_buffer_dlt_to_item_lead_time = (
+			0
+			if settings.sync_buffer_dlt_to_item_lead_time is None
+			else settings.sync_buffer_dlt_to_item_lead_time
+		)
 	settings.use_material_need_date_for_pegging = (
 		1
 		if settings.use_material_need_date_for_pegging is None
@@ -56,6 +69,36 @@ def ensure_default_settings():
 	settings.default_material_request_type = settings.default_material_request_type or "Purchase"
 	settings.flags.ignore_mandatory = True
 	settings.save(ignore_permissions=True)
+	ensure_default_buffer_profile()
+
+
+def ensure_default_buffer_profile():
+	if not frappe.db.exists("DocType", "MRP Buffer Profile"):
+		return
+	if frappe.db.exists("MRP Buffer Profile", "standard-replenish"):
+		return
+	frappe.get_doc(
+		{
+			"doctype": "MRP Buffer Profile",
+			"profile_name": "standard-replenish",
+			"active": 1,
+			"lead_time_factor": 1,
+			"variability_factor": 0.5,
+			"default_order_cycle_days": 0,
+		}
+	).insert(ignore_permissions=True)
+
+
+def _standard_custom_fields_for_site():
+	fields = {doctype: [dict(field) for field in field_list] for doctype, field_list in STANDARD_CUSTOM_FIELDS.items()}
+	item_fields = fields.get("Item") or []
+	if item_fields and not _has_field("Item", "lead_time_days"):
+		item_fields[0]["insert_after"] = "safety_stock" if _has_field("Item", "safety_stock") else "reorder_levels"
+	return fields
+
+
+def _has_field(doctype, fieldname):
+	return frappe.db.exists("DocType", doctype) and frappe.get_meta(doctype).has_field(fieldname)
 
 
 def ensure_safe_to_uninstall():
