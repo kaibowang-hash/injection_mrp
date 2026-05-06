@@ -209,6 +209,9 @@ frappe.provide("injection_mrp.ui");
 		Info: "INF",
 		Critical: "CRT",
 		None: "OK",
+		Red: "RED",
+		Yellow: "YLW",
+		Green: "GRN",
 		Purchase: "PUR",
 		Manufacture: "MFG",
 		Manufacturing: "MFG",
@@ -310,6 +313,15 @@ frappe.provide("injection_mrp.ui");
 	injection_mrp.ui.code_tone = function (value, kind) {
 		const text = String(value || "");
 		if (kind === "warning") {
+			if (/^Red$/i.test(text)) {
+				return "red";
+			}
+			if (/^Yellow$/i.test(text)) {
+				return "orange";
+			}
+			if (/^Green$/i.test(text)) {
+				return "green";
+			}
 			if (/Critical|Past Due|Late Supply|Missing BOM|Missing Supplier/i.test(text)) {
 				return "red";
 			}
@@ -721,6 +733,54 @@ frappe.provide("injection_mrp.ui");
 			on_change();
 		};
 		return control;
+	};
+
+	injection_mrp.ui.buffer_chart_html = function (row) {
+		row = row || {};
+		const value = (field, fallback) => Number(row[field] == null || row[field] === "" ? fallback || 0 : row[field]) || 0;
+		const topRed = value("top_of_red", value("buffer_top_of_red"));
+		const topYellow = value("top_of_yellow", value("buffer_top_of_yellow"));
+		const topGreen = value("top_of_green", value("buffer_top_of_green"));
+		const red = Math.max(value("red_zone_qty", topRed), 0);
+		const yellow = Math.max(value("yellow_zone_qty", topYellow - topRed), 0);
+		const green = Math.max(value("green_zone_qty", topGreen - topYellow), 0);
+		const nfp = value(
+			"net_flow_position",
+			value("buffer_nfp_percent") ? topGreen * value("buffer_nfp_percent") / 100 : value("buffer_recommended_qty") ? topGreen - value("buffer_recommended_qty") : 0
+		);
+		const onHand = value("on_hand_qty");
+		const max = Math.max(topGreen, nfp, onHand, 1);
+		const pct = (number) => Math.max(0, Math.min(100, (Number(number || 0) / max) * 100));
+		const priority = row.planning_priority || row.buffer_priority || "";
+		const bufferName = row.name && row.doctype === "MRP Stock Buffer" ? row.name : row.stock_buffer;
+		if (!topGreen && !bufferName) {
+			return `<div class="ia-muted">${__("No stock buffer data found.")}</div>`;
+		}
+		return `
+			<div class="imrp-buffer-chart">
+				<div class="imrp-buffer-plot" style="--red:${pct(red)}%; --yellow:${pct(yellow)}%; --green:${pct(green)}%; --nfp:${pct(nfp)}%; --onhand:${pct(onHand)}%;">
+					<div class="imrp-buffer-axis"></div>
+					<div class="imrp-buffer-stack">
+						<div class="imrp-buffer-zone green"><span>${injection_mrp.ui.format_number(green)}</span></div>
+						<div class="imrp-buffer-zone yellow"><span>${injection_mrp.ui.format_number(yellow)}</span></div>
+						<div class="imrp-buffer-zone red"><span>${injection_mrp.ui.format_number(red)}</span></div>
+					</div>
+					<div class="imrp-buffer-line nfp"><span>${injection_mrp.ui.format_number(nfp)}</span></div>
+					<div class="imrp-buffer-line onhand"><span>${injection_mrp.ui.format_number(onHand)}</span></div>
+				</div>
+				<div class="imrp-buffer-legend">
+					<span><i class="red"></i>${__("Red zone")}: ${injection_mrp.ui.format_number(red)}</span>
+					<span><i class="yellow"></i>${__("Yellow zone")}: ${injection_mrp.ui.format_number(yellow)}</span>
+					<span><i class="green"></i>${__("Green zone")}: ${injection_mrp.ui.format_number(green)}</span>
+					<span><i class="line"></i>${__("Net Flow Position")}: ${injection_mrp.ui.format_number(nfp)}</span>
+					<span><i class="dash"></i>${__("On-Hand Position")}: ${injection_mrp.ui.format_number(onHand)}</span>
+				</div>
+				<div class="imrp-buffer-metrics">
+					<span>${__("Priority")}: <b>${injection_mrp.ui.escape(priority || "-")}</b></span>
+					<span>${__("NFP %")}: <b>${injection_mrp.ui.format_number(value("net_flow_position_percent", value("buffer_nfp_percent")), 2)}%</b></span>
+					<span>${__("Recommended")}: <b>${injection_mrp.ui.format_number(value("recommended_qty", value("buffer_recommended_qty")))}</b></span>
+				</div>
+			</div>`;
 	};
 
 	injection_mrp.ui.export_rows = function (filename, columns, rows, options) {

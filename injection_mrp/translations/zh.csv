@@ -449,3 +449,88 @@ Supply Route,供应路线
 Match,匹配条件
 Duplicate warehouse default for supply mode {0}.,供应方式 {0} 的默认仓库配置重复。
 MRP rounds suggested order quantity up to a multiple of this quantity. Leave blank to use Item Price Packing Unit when available.,MRP 会将建议下单数量向上取整到该倍量；留空时优先使用物料价格中的包装单位。
+MRP Buffer Profile,MRP 缓冲策略
+MRP Stock Buffer,MRP 库存缓冲
+Stock Buffer,库存缓冲
+Buffer Profile,缓冲策略
+Buffer Policy,缓冲策略
+Profile Name,策略名称
+Lead Time Factor,前置时间系数
+Variability Factor,波动系数
+Default Order Cycle Days,默认订货周期天数
+Use Stock Buffer for Safety Stock,使用库存缓冲计算安全库存
+Sync Buffer DLT to Item Lead Time,将缓冲 DLT 同步到物料前置时间
+Default MRP Stock Buffer,默认 MRP 库存缓冲
+MRP Lead Time Days,MRP 前置时间（天）
+Owned by Injection MRP. Default buffer controls MRP lead time.,由 Injection MRP 管理。默认缓冲控制 MRP 前置时间。
+Owned by Injection MRP. Used on ERPNext versions without native Item Lead Time Days.,由 Injection MRP 管理。用于没有标准物料前置时间字段的 ERPNext 版本。
+DLT Days,解耦前置时间（天）
+Minimum Order Cycle Days,最小订货周期天数
+Minimum Order Qty,最小下单数量
+ADU,平均日用量
+ADU Calculation Method,平均日用量计算方式
+Fixed ADU,固定平均日用量
+Past Actual,历史实际
+Future MRP,未来 MRP
+Blended,混合
+Past Horizon Days,历史周期天数
+Future Horizon Days,未来周期天数
+Past Factor,历史权重
+Future Factor,未来权重
+Buffer Zones,缓冲区
+Red Base Qty,红区基础数量
+Red Safety Qty,红区安全数量
+Red Zone Qty,红区数量
+Yellow Zone Qty,黄区数量
+Green Zone Qty,绿区数量
+Top of Red,红区上限
+Top of Yellow,黄区上限
+Top of Green,绿区上限
+Net Flow,净流量
+On Hand Qty,现有库存数量
+Incoming DLT Qty,DLT 内在途数量
+Qualified Demand Qty,合格需求数量
+Net Flow Position,净流量位置
+Net Flow Position %,净流量位置 %
+Planning Priority,计划优先级
+Recommended Qty,建议补货数量
+Last Calculated On,最后计算时间
+Lead Time Sync Status,前置时间同步状态
+Buffer Summary,缓冲摘要
+Buffer,缓冲
+Buffer Priority,缓冲优先级
+NFP %,净流量位置 %
+Buffer Recommended,缓冲建议数量
+Buffer Recommended Qty,缓冲建议数量
+Buffer Top of Red,缓冲红区上限
+Buffer Top of Yellow,缓冲黄区上限
+Buffer Top of Green,缓冲绿区上限
+Buffer Lead Time Days,缓冲前置时间（天）
+Refresh Buffer,刷新缓冲
+No stock buffer is linked to this requirement.,该需求未关联库存缓冲。
+No stock buffer data found.,未找到库存缓冲数据。
+Red zone,红区
+Yellow zone,黄区
+Green zone,绿区
+On-Hand Position,现有库存位置
+Priority,优先级
+Recommended,建议数量
+"Stock buffer top-up demand. Priority: {0}, NFP: {1}%",库存缓冲补货需求。优先级：{0}，净流量位置：{1}%
+Stock Buffer DLT is empty; MRP used supplier or item lead time.,库存缓冲 DLT 为空；MRP 使用供应商或物料前置时间。
+Lead Time Source Fallback,前置时间来源回退
+Lead Time Source Mismatch,前置时间来源不一致
+Supplier lead time {0} day(s) differs from Stock Buffer DLT {1} day(s); MRP used the Stock Buffer value.,供应商前置时间 {0} 天与库存缓冲 DLT {1} 天不同；MRP 已使用库存缓冲值。
+Default buffer controls MRP lead time.,默认缓冲控制 MRP 前置时间。
+Not the default Item buffer.,不是物料默认缓冲。
+Item lead time is controlled by default MRP Stock Buffer {0}. Please update the Stock Buffer DLT instead.,物料前置时间由默认 MRP 库存缓冲 {0} 控制。请改为维护库存缓冲 DLT。
+An active MRP Stock Buffer already exists for this company, item and warehouse.,该公司、物料和仓库已存在启用的 MRP 库存缓冲。
+An active default MRP Stock Buffer already exists for this company and item.,该公司和物料已存在启用的默认 MRP 库存缓冲。
+DLT Days cannot be negative.,DLT 天数不能为负数。
+Lead Time Factor and Variability Factor cannot be negative.,前置时间系数和波动系数不能为负数。
+Minimum Order Cycle Days cannot be negative.,最小订货周期天数不能为负数。
+Fixed ADU cannot be negative.,固定平均日用量不能为负数。
+ADU blend factors cannot be negative.,平均日用量混合权重不能为负数。
+Minimum order quantity and order multiple cannot be negative.,最小下单数量和下单倍量不能为负数。
+Lead Time Factor cannot be negative.,前置时间系数不能为负数。
+Variability Factor cannot be negative.,波动系数不能为负数。
+Default Order Cycle Days cannot be negative.,默认订货周期天数不能为负数。
