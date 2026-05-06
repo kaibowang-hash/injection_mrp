@@ -551,6 +551,7 @@ def get_run_comparison_data(mrp_run: str, previous_run: str | None = None) -> di
 		"previous_run": previous.as_dict() if previous else None,
 		"rows": rows,
 		"summary": dict(summary),
+		"buffer_rows": _get_run_buffer_summaries(current),
 	}
 
 
@@ -1428,6 +1429,138 @@ def _summarize_run_requirements(mrp_run: str) -> dict[tuple[str, str, str, str],
 		target["new_supply_qty"] += flt(row.new_supply_qty)
 		target["prebuy_consumed_qty"] += flt(row.prebuy_consumed_qty)
 	return result
+
+
+def _get_run_buffer_summaries(run, limit: int = 8) -> list[dict[str, Any]]:
+	if not _doctype_exists("MRP Stock Buffer") or not _has_field("MRP Requirement Line", "stock_buffer"):
+		return []
+	rows = frappe.get_all(
+		"MRP Requirement Line",
+		filters={"mrp_run": run.name},
+		fields=[
+			"stock_buffer",
+			"item_code",
+			"item_name",
+			"warehouse",
+			"required_date",
+			"suggested_order_date",
+			"net_qty",
+			"new_supply_qty",
+			"buffer_priority",
+			"buffer_nfp_percent",
+			"buffer_recommended_qty",
+			"buffer_top_of_red",
+			"buffer_top_of_yellow",
+			"buffer_top_of_green",
+			"buffer_lead_time_days",
+		],
+		limit_page_length=100000,
+	)
+	by_buffer: dict[str, dict[str, Any]] = {}
+	for row in rows:
+		if not row.stock_buffer:
+			continue
+		target = by_buffer.setdefault(
+			row.stock_buffer,
+			{
+				"stock_buffer": row.stock_buffer,
+				"item_code": row.item_code,
+				"item_name": row.item_name,
+				"warehouse": row.warehouse,
+				"requirement_count": 0,
+				"current_net_qty": 0,
+				"current_new_supply_qty": 0,
+				"earliest_required_date": row.required_date,
+				"suggested_order_date": row.suggested_order_date,
+				"buffer_priority": row.buffer_priority,
+				"buffer_nfp_percent": flt(row.buffer_nfp_percent),
+				"buffer_recommended_qty": flt(row.buffer_recommended_qty),
+				"buffer_top_of_red": flt(row.buffer_top_of_red),
+				"buffer_top_of_yellow": flt(row.buffer_top_of_yellow),
+				"buffer_top_of_green": flt(row.buffer_top_of_green),
+				"buffer_lead_time_days": cint(row.buffer_lead_time_days),
+			},
+		)
+		target["requirement_count"] += 1
+		target["current_net_qty"] += flt(row.net_qty)
+		target["current_new_supply_qty"] += flt(row.new_supply_qty)
+		if row.required_date and (not target.get("earliest_required_date") or row.required_date < target["earliest_required_date"]):
+			target["earliest_required_date"] = row.required_date
+		if row.suggested_order_date and (
+			not target.get("suggested_order_date") or row.suggested_order_date < target["suggested_order_date"]
+		):
+			target["suggested_order_date"] = row.suggested_order_date
+
+	priority_order = {"Red": 0, "Yellow": 1, "Green": 2}
+	row_limit = cint(limit) or 8
+	candidate_summaries = sorted(
+		by_buffer.items(),
+		key=lambda item: (
+			priority_order.get(item[1].get("buffer_priority"), 3),
+			flt(item[1].get("buffer_nfp_percent")) if item[1].get("buffer_nfp_percent") not in (None, "") else 999999,
+			-flt(item[1].get("buffer_recommended_qty")),
+			item[1].get("item_code") or "",
+		),
+	)[:row_limit]
+
+	buffers = []
+	for buffer_name, summary in candidate_summaries:
+		state = frappe._dict()
+		try:
+			state = stock_buffer.refresh_buffer(buffer_name, run=run, persist=False)
+		except Exception:
+			state = frappe._dict()
+		top_red = flt(state.get("top_of_red")) or flt(summary.get("buffer_top_of_red"))
+		top_yellow = flt(state.get("top_of_yellow")) or flt(summary.get("buffer_top_of_yellow"))
+		top_green = flt(state.get("top_of_green")) or flt(summary.get("buffer_top_of_green"))
+		nfp_percent = flt(state.get("net_flow_position_percent")) or flt(summary.get("buffer_nfp_percent"))
+		net_flow_position = flt(state.get("net_flow_position"))
+		if not net_flow_position and nfp_percent and top_green:
+			net_flow_position = top_green * nfp_percent / 100
+		row = dict(summary)
+		row.update(
+			{
+				"name": buffer_name,
+				"doctype": "MRP Stock Buffer",
+				"adu": flt(state.get("adu")) or 0,
+				"red_zone_qty": flt(state.get("red_zone_qty")) or top_red,
+				"yellow_zone_qty": flt(state.get("yellow_zone_qty")) or max(top_yellow - top_red, 0),
+				"green_zone_qty": flt(state.get("green_zone_qty")) or max(top_green - top_yellow, 0),
+				"top_of_red": top_red,
+				"top_of_yellow": top_yellow,
+				"top_of_green": top_green,
+				"net_flow_position": net_flow_position,
+				"net_flow_position_percent": nfp_percent,
+				"on_hand_qty": flt(state.get("on_hand_qty")) or 0,
+				"incoming_dlt_qty": flt(state.get("incoming_dlt_qty")) or 0,
+				"qualified_demand_qty": flt(state.get("qualified_demand_qty")) or 0,
+				"planning_priority": state.get("planning_priority") or summary.get("buffer_priority"),
+				"recommended_qty": flt(state.get("recommended_qty")) or flt(summary.get("buffer_recommended_qty")),
+				"dlt_days": flt(state.get("dlt_days")) or cint(summary.get("buffer_lead_time_days")),
+			}
+		)
+		row["buffer_priority"] = row["planning_priority"]
+		row["buffer_nfp_percent"] = row["net_flow_position_percent"]
+		row["buffer_recommended_qty"] = row["recommended_qty"]
+		row["buffer_top_of_red"] = row["top_of_red"]
+		row["buffer_top_of_yellow"] = row["top_of_yellow"]
+		row["buffer_top_of_green"] = row["top_of_green"]
+		row["buffer_lead_time_days"] = cint(row["dlt_days"])
+		buffers.append(row)
+
+	def sort_nfp(row):
+		value = row.get("buffer_nfp_percent")
+		return flt(value) if value not in (None, "") else 999999
+
+	buffers.sort(
+		key=lambda row: (
+			priority_order.get(row.get("buffer_priority"), 3),
+			sort_nfp(row),
+			-flt(row.get("buffer_recommended_qty")),
+			row.get("item_code") or "",
+		)
+	)
+	return buffers[:row_limit]
 
 
 def _pagination_args(limit_start: int | str | None, limit_page_length: int | str | None, default_length: int):
