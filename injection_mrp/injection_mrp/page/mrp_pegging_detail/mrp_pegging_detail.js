@@ -36,9 +36,21 @@ frappe.pages["mrp-pegging-detail"].on_page_load = function (wrapper) {
 		{ label: __("Adjustment Date"), fieldname: "adjustment_date", formatter: ui.format_date },
 	];
 
-	function open_detail(row) {
+	async function open_detail(row) {
 		if (!row) {
 			return;
+		}
+		let bufferState = null;
+		try {
+			bufferState = await ui.with_busy(__("Loading stock buffer..."), () =>
+				ui.xcall("injection_mrp.api.app.get_stock_buffer_chart_data", {
+					item_code: row.item_code,
+					company: row.company,
+					warehouse: row.warehouse,
+				})
+			);
+		} catch (error) {
+			console.warn("Unable to load stock buffer chart data", error);
 		}
 		ui.open_drawer(row.name, [
 			{
@@ -52,6 +64,12 @@ frappe.pages["mrp-pegging-detail"].on_page_load = function (wrapper) {
 					{ label: __("Material Need Date"), value: ui.format_date(row.material_need_date) },
 					{ label: __("Demand Qty"), value: ui.format_number(row.demand_qty) },
 				],
+			},
+			{
+				title: __("Stock Buffer"),
+				html: bufferState
+					? ui.buffer_chart_html(bufferState)
+					: `<div class="ia-muted">${__("Could not load live stock buffer values.")}</div>`,
 			},
 			{
 				title: __("Supply"),

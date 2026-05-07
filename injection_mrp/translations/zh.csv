@@ -453,6 +453,8 @@ MRP Buffer Profile,MRP 缓冲策略
 MRP Stock Buffer,MRP 库存缓冲
 MRP Stock Buffer Console,MRP 库存缓冲控制台
 Stock Buffer,库存缓冲
+Item Safety Stock,物料安全库存
+Buffer Safety Stock,缓冲安全库存
 Buffer Profile,缓冲策略
 Buffer Policy,缓冲策略
 Profile Name,策略名称
@@ -463,10 +465,13 @@ Use Stock Buffer for Safety Stock,使用库存缓冲计算安全库存
 Use MRP Stock Buffer,启用 MRP 库存缓冲
 Use Stock Buffer,启用库存缓冲
 Sync Buffer DLT to Item Lead Time,将缓冲 DLT 同步到物料前置时间
+Sync Buffer Safety Stock to Item Safety Stock,将缓冲安全库存同步到物料安全库存
+Sync the default stock buffer Top of Red to Item Safety Stock.,将默认库存缓冲的红区上限同步到物料安全库存。
 Default MRP Stock Buffer,默认 MRP 库存缓冲
 MRP Lead Time Days,MRP 前置时间（天）
 Enable automatic MRP Stock Buffer creation and scheduled recalculation for this item.,为该物料启用自动创建 MRP 库存缓冲和定时重算。
 Owned by Injection MRP. Default buffer controls MRP lead time.,由 Injection MRP 管理。默认缓冲控制 MRP 前置时间。
+Owned by Injection MRP. Default buffer controls MRP lead time and safety stock.,由 Injection MRP 管理。默认缓冲控制 MRP 前置时间和安全库存。
 Owned by Injection MRP. Used on ERPNext versions without native Item Lead Time Days.,由 Injection MRP 管理。用于没有标准物料前置时间字段的 ERPNext 版本。
 DLT Days,解耦前置时间（天）
 Minimum Order Cycle Days,最小订货周期天数
@@ -522,6 +527,8 @@ Refresh Buffers,刷新缓冲
 Apply Group Defaults,应用物料组默认值
 Apply Suggestions,应用建议值
 Loading stock buffers...,正在加载库存缓冲...
+Loading stock buffer...,正在加载库存缓冲...
+Could not load live stock buffer values.,无法加载实时库存缓冲值。
 No stock buffer rows found.,未找到库存缓冲行。
 Creating missing stock buffers...,正在创建缺失库存缓冲...
 Refreshing stock buffers...,正在刷新库存缓冲...
@@ -529,6 +536,23 @@ Applying stock buffer defaults...,正在应用库存缓冲默认值...
 Applying stock buffer suggestions...,正在应用库存缓冲建议值...
 Done. Updated: {0},完成。已更新：{0}
 System Suggestions,系统建议
+Buffer Chart,缓冲图表
+Status Details,状态明细
+Explanation,说明
+Conflict Details,冲突明细
+Default Buffers,默认缓冲
+Net Flow Calculation,净流量计算
+Formula,公式
+On Hand Qty + Incoming DLT Qty - Qualified Demand Qty.,现有库存 + DLT 内到货 - DLT 内有效需求。
+Recommendation Rule,建议规则
+"NFP is below Top of Yellow. Recommended Qty refills to Top of Green, then applies Minimum Order Qty and Order Multiple Qty.",NFP 低于黄区上限。建议数量先补到绿区上限，再应用最小下单量和订货倍量。
+"NFP is at or above Top of Yellow, so no top-up is recommended.",NFP 已达到或高于黄区上限，因此不建议补货。
+DLT Suggestion,DLT 建议
+Current DLT Days,当前 DLT 天数
+Source Explanation,来源说明
+Confidence Explanation,可信度说明
+Procurement Constraints,采购约束
+Mismatch Explanation,不一致说明
 Suggested DLT Days,建议 DLT 天数
 Suggested DLT Source,建议 DLT 来源
 Suggested DLT Confidence,建议 DLT 可信度
@@ -589,6 +613,7 @@ Supplier lead time {0} day(s) differs from Stock Buffer DLT {1} day(s); MRP used
 Default buffer controls MRP lead time.,默认缓冲控制 MRP 前置时间。
 Not the default Item buffer.,不是物料默认缓冲。
 Item lead time is controlled by default MRP Stock Buffer {0}. Please update the Stock Buffer DLT instead.,物料前置时间由默认 MRP 库存缓冲 {0} 控制。请改为维护库存缓冲 DLT。
+Item safety stock is controlled by default MRP Stock Buffer {0}. Please update the Stock Buffer instead.,物料安全库存由默认 MRP 库存缓冲 {0} 控制。请改为维护库存缓冲。
 An active MRP Stock Buffer already exists for this company, item and warehouse.,该公司、物料和仓库已存在启用的 MRP 库存缓冲。
 An active default MRP Stock Buffer already exists for this company and item.,该公司和物料已存在启用的默认 MRP 库存缓冲。
 DLT Days cannot be negative.,DLT 天数不能为负数。
@@ -600,3 +625,34 @@ Minimum order quantity and order multiple cannot be negative.,最小下单数量
 Lead Time Factor cannot be negative.,前置时间系数不能为负数。
 Variability Factor cannot be negative.,波动系数不能为负数。
 Default Order Cycle Days cannot be negative.,默认订货周期天数不能为负数。
+Item is disabled or is not a stock item, so MRP stock buffer automation will not create or refresh a buffer.,物料已禁用或不是库存物料，因此 MRP 库存缓冲自动化不会创建或刷新缓冲。
+Use MRP Stock Buffer is off on the Item master, so this item is excluded from buffer automation.,物料主数据未启用 MRP 库存缓冲，因此该物料不会参与缓冲自动化。
+No default warehouse was found for this item and company. Maintain Item Default Warehouse before creating a stock buffer.,未找到该物料和公司的默认仓库。创建库存缓冲前请先维护物料默认仓库。
+The item is enabled for MRP stock buffer automation, but no active buffer exists for this company, item and warehouse.,该物料已启用 MRP 库存缓冲自动化，但该公司、物料、仓库下没有启用的缓冲。
+Active stock buffer records conflict with the item default buffer setup.,启用的库存缓冲记录与物料默认缓冲设置冲突。
+The buffer DLT is empty and no DLT suggestion is available. Maintain DLT manually or add a lead-time source.,缓冲 DLT 为空，并且没有可用的 DLT 建议。请手工维护 DLT 或补充前置时间来源。
+The buffer DLT is empty, but the system found a suggested DLT. Review the source and apply it if it is correct.,缓冲 DLT 为空，但系统找到了 DLT 建议。请复核来源，确认正确后应用。
+The buffer was not calculated recently. Refresh it so on-hand stock, incoming supply and qualified demand are recalculated.,缓冲最近未重新计算。请刷新以重算现有库存、DLT 内到货和有效需求。
+The maintained buffer DLT differs from the system suggested DLT. Review the source before applying the suggestion.,当前维护的缓冲 DLT 与系统建议 DLT 不一致。应用建议前请先复核来源。
+The maintained purchase constraints differ from the system suggestions.,当前维护的采购约束与系统建议不一致。
+The suggested DLT comes from a low-confidence source and should be reviewed manually before applying.,建议 DLT 来源可信度较低，应用前需要人工复核。
+No setup issue was detected for this stock buffer.,未发现该库存缓冲存在设置问题。
+Multiple active buffers exist for the same company, item and warehouse: {0}.,同一公司、物料、仓库存在多个启用缓冲：{0}。
+Multiple active default buffers exist for this item: {0}.,该物料存在多个启用的默认缓冲：{0}。
+The item default buffer exists, but not for the resolved warehouse {0}: {1}.,物料默认缓冲存在，但不属于当前解析出的仓库 {0}：{1}。
+The buffer for the resolved warehouse is {0}, but the item default buffer is {1}.,当前解析仓库对应缓冲为 {0}，但物料默认缓冲为 {1}。
+blank,空
+blank warehouse,空仓库
+No maintained DLT source was found.,未找到已维护的 DLT 来源。
+Suggested DLT is {0} day(s), calculated from {1}.,建议 DLT 为 {0} 天，来源为 {1}。
+an unspecified source,未指定来源
+No confidence rating is available because no DLT suggestion was found.,没有 DLT 建议，因此没有可信度评级。
+High confidence means the source is specific to this item or matched supplier, such as an item-specific supply rule or supplier quotation.,高可信度表示来源与该物料或匹配供应商直接相关，例如物料级供应规则或供应商报价。
+Medium confidence means the source is maintained but less direct, such as item lead time, a broader supply rule, supplier item price, or enough purchase history.,中可信度表示来源已维护但不够直接，例如物料前置时间、较宽泛的供应规则、供应商物料价格或足够的采购历史。
+Low confidence means the purchase history sample is small. Review the suggested DLT before applying it.,低可信度表示采购历史样本较少。应用建议 DLT 前请复核。
+Low confidence means the source is generic, missing supplier context, or no maintained lead-time source was found.,低可信度表示来源较通用、缺少供应商上下文，或未找到已维护的前置时间来源。
+Review the DLT suggestion before applying it.,应用 DLT 建议前请先复核。
+Minimum Order Qty is {0}, but the suggested value is {1}.,当前最小下单数量为 {0}，建议值为 {1}。
+Order Multiple Qty is {0}, but the suggested value is {1}.,当前订货倍量为 {0}，建议值为 {1}。
+Maintained procurement constraints currently match the available suggestions.,当前维护的采购约束与可用建议一致。
+Top Critical Buffers,关键缓冲摘要

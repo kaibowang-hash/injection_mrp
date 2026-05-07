@@ -687,7 +687,7 @@ frappe.provide("injection_mrp.ui");
 		}
 		const head = columns.map((col) => `<th data-imrp-tooltip="${injection_mrp.ui.escape(col.header_title || col.label)}">${injection_mrp.ui.escape(col.label)}</th>`).join("");
 		const body = rows
-			.map((row) => {
+			.map((row, index) => {
 				const cells = columns
 					.map((col) => {
 						const value = col.formatter
@@ -697,7 +697,7 @@ frappe.provide("injection_mrp.ui");
 						return `<td class="${cls}">${value == null ? "" : value}</td>`;
 					})
 					.join("");
-				return `<tr data-name="${injection_mrp.ui.escape(row.name || "")}">${cells}</tr>`;
+				return `<tr data-row-index="${index}" data-name="${injection_mrp.ui.escape(row.name || "")}">${cells}</tr>`;
 			})
 			.join("");
 		target.html(`
@@ -717,8 +717,9 @@ frappe.provide("injection_mrp.ui");
 		}
 		if (options.on_row_click) {
 			target.find("tbody tr").on("click", function () {
-				const name = $(this).data("name");
-				const row = rows.find((candidate) => candidate.name === name);
+				const rowIndex = Number($(this).attr("data-row-index"));
+				const name = $(this).attr("data-name");
+				const row = Number.isInteger(rowIndex) ? rows[rowIndex] : rows.find((candidate) => String(candidate.name || "") === String(name || ""));
 				options.on_row_click(row || { name });
 			});
 		}
@@ -760,6 +761,18 @@ frappe.provide("injection_mrp.ui");
 		if (!topGreen && !bufferName) {
 			return `<div class="ia-muted">${__("No stock buffer data found.")}</div>`;
 		}
+		const legendItems = [
+			{ tone: "red", label: __("Red zone"), value: injection_mrp.ui.format_number(red) },
+			{ tone: "yellow", label: __("Yellow zone"), value: injection_mrp.ui.format_number(yellow) },
+			{ tone: "green", label: __("Green zone"), value: injection_mrp.ui.format_number(green) },
+			{ tone: "line", label: __("Net Flow Position"), value: injection_mrp.ui.format_number(nfp) },
+			{ tone: "dash", label: __("On-Hand Position"), value: injection_mrp.ui.format_number(onHand) },
+		];
+		const metricItems = [
+			{ label: __("Priority"), value: injection_mrp.ui.escape(priority || "-") },
+			{ label: __("NFP %"), value: `${injection_mrp.ui.format_number(value("net_flow_position_percent", value("buffer_nfp_percent")), 2)}%` },
+			{ label: __("Recommended"), value: injection_mrp.ui.format_number(value("recommended_qty", value("buffer_recommended_qty"))) },
+		];
 		return `
 			<div class="imrp-buffer-chart">
 				<div class="imrp-buffer-plot" style="--red:${pct(red)}%; --yellow:${pct(yellow)}%; --green:${pct(green)}%; --nfp:${pct(nfp)}%; --onhand:${pct(onHand)}%;">
@@ -773,16 +786,26 @@ frappe.provide("injection_mrp.ui");
 					<div class="imrp-buffer-line onhand"><span>${injection_mrp.ui.format_number(onHand)}</span></div>
 				</div>
 				<div class="imrp-buffer-legend">
-					<span><i class="red"></i>${__("Red zone")}: ${injection_mrp.ui.format_number(red)}</span>
-					<span><i class="yellow"></i>${__("Yellow zone")}: ${injection_mrp.ui.format_number(yellow)}</span>
-					<span><i class="green"></i>${__("Green zone")}: ${injection_mrp.ui.format_number(green)}</span>
-					<span><i class="line"></i>${__("Net Flow Position")}: ${injection_mrp.ui.format_number(nfp)}</span>
-					<span><i class="dash"></i>${__("On-Hand Position")}: ${injection_mrp.ui.format_number(onHand)}</span>
+					${legendItems
+						.map(
+							(item) => `
+							<div class="imrp-buffer-legend-row">
+								<span class="imrp-buffer-legend-label"><i class="${item.tone}"></i><span>${item.label}</span></span>
+								<b class="imrp-buffer-legend-value">${item.value}</b>
+							</div>`
+						)
+						.join("")}
 				</div>
 				<div class="imrp-buffer-metrics">
-					<span>${__("Priority")}: <b>${injection_mrp.ui.escape(priority || "-")}</b></span>
-					<span>${__("NFP %")}: <b>${injection_mrp.ui.format_number(value("net_flow_position_percent", value("buffer_nfp_percent")), 2)}%</b></span>
-					<span>${__("Recommended")}: <b>${injection_mrp.ui.format_number(value("recommended_qty", value("buffer_recommended_qty")))}</b></span>
+					${metricItems
+						.map(
+							(item) => `
+							<div class="imrp-buffer-metric">
+								<span>${item.label}</span>
+								<b>${item.value}</b>
+							</div>`
+						)
+						.join("")}
 				</div>
 			</div>`;
 	};
@@ -868,9 +891,15 @@ frappe.provide("injection_mrp.ui");
 			}
 			const rows = (section.rows || [])
 				.map(
-					(row) => `
+					(row) => {
+						const content =
+							row.html !== undefined && row.html !== null
+								? row.html
+								: injection_mrp.ui.escape(row.value === undefined || row.value === null ? "" : row.value);
+						return `
 					<div class="key">${injection_mrp.ui.escape(row.label)}</div>
-					<div class="value">${row.html || injection_mrp.ui.escape(row.value || "")}</div>`
+					<div class="value">${content}</div>`;
+					}
 				)
 				.join("");
 			body.append(`

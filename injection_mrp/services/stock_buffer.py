@@ -703,6 +703,7 @@ def sync_default_buffer_to_item(buffer) -> None:
 				before.get("item_code"),
 				before.get("name"),
 				before.get("dlt_days"),
+				before.get("top_of_red"),
 			)
 
 	if not cint(buffer.get("active")) or not cint(buffer.get("is_default_for_item")) or not buffer.get("item_code"):
@@ -715,15 +716,22 @@ def sync_default_buffer_to_item(buffer) -> None:
 		values["custom_mrp_lead_time_days"] = cint(buffer.get("dlt_days"))
 	if _sync_standard_item_lead_time_enabled() and _has_field("Item", "lead_time_days"):
 		values["lead_time_days"] = cint(buffer.get("dlt_days"))
+	if _sync_item_safety_stock_enabled() and _has_field("Item", "safety_stock"):
+		values["safety_stock"] = _get_buffer_item_safety_stock(buffer)
 	if values:
 		frappe.db.set_value("Item", buffer.item_code, values)
 
 
-def _clear_default_buffer_from_item(item_code: str | None, buffer_name: str | None, dlt_days: float | int | None = None) -> None:
+def _clear_default_buffer_from_item(
+	item_code: str | None,
+	buffer_name: str | None,
+	dlt_days: float | int | None = None,
+	safety_stock_qty: float | int | None = None,
+) -> None:
 	if not item_code or not buffer_name:
 		return
 	fields = []
-	for fieldname in ("custom_mrp_default_stock_buffer", "custom_mrp_lead_time_days", "lead_time_days"):
+	for fieldname in ("custom_mrp_default_stock_buffer", "custom_mrp_lead_time_days", "lead_time_days", "safety_stock"):
 		if _has_field("Item", fieldname):
 			fields.append(fieldname)
 	if not fields:
@@ -742,12 +750,20 @@ def _clear_default_buffer_from_item(item_code: str | None, buffer_name: str | No
 		and cint(item.get("lead_time_days")) == cint(dlt_days)
 	):
 		values["lead_time_days"] = 0
+	if (
+		_sync_item_safety_stock_enabled()
+		and _has_field("Item", "safety_stock")
+		and abs(flt(item.get("safety_stock")) - flt(safety_stock_qty)) <= 0.000001
+	):
+		values["safety_stock"] = 0
 	if values:
 		frappe.db.set_value("Item", item_code, values)
 
 
 def validate_item_lead_time_lock(doc, method=None):
-	if getattr(doc, "flags", None) and doc.flags.get("ignore_mrp_buffer_lead_time_lock"):
+	if getattr(doc, "flags", None) and (
+		doc.flags.get("ignore_mrp_buffer_lead_time_lock") or doc.flags.get("ignore_mrp_buffer_item_lock")
+	):
 		return
 	buffer_name = doc.get("custom_mrp_default_stock_buffer") if hasattr(doc, "get") else None
 	if not buffer_name:
@@ -769,6 +785,20 @@ def validate_item_lead_time_lock(doc, method=None):
 					"Item lead time is controlled by default MRP Stock Buffer {0}. Please update the Stock Buffer DLT instead."
 				).format(buffer_name)
 			)
+	if (
+		_sync_item_safety_stock_enabled()
+		and _has_field("Item", "safety_stock")
+		and abs(flt(before.get("safety_stock")) - flt(doc.get("safety_stock"))) > 0.000001
+	):
+		frappe.throw(
+			_(
+				"Item safety stock is controlled by default MRP Stock Buffer {0}. Please update the Stock Buffer instead."
+			).format(buffer_name)
+		)
+
+
+def _get_buffer_item_safety_stock(buffer) -> float:
+	return flt(buffer.get("top_of_red") or buffer.get("red_zone_qty"))
 
 
 def validate_buffer_uniqueness(doc) -> None:
@@ -802,10 +832,31 @@ def validate_buffer_uniqueness(doc) -> None:
 			frappe.throw(_("An active default MRP Stock Buffer already exists for this company and item."))
 
 
-def get_chart_data(buffer_name: str | None = None, item_code: str | None = None, company: str | None = None, warehouse: str | None = None):
+def get_chart_data(
+	buffer_name: str | None = None,
+	item_code: str | None = None,
+	company: str | None = None,
+	warehouse: str | None = None,
+	include_suggestions: bool = True,
+):
 	if buffer_name:
-		return refresh_buffer(buffer_name, persist=False)
-	return get_buffer_state_for_item(item_code or "", company, warehouse, persist=False) or frappe._dict()
+		return _with_buffer_explanations(
+			refresh_buffer(buffer_name, persist=False, include_suggestions=include_suggestions)
+		)
+	resolved_buffer = get_buffer_name_for_item(item_code or "", company, warehouse)
+	if not resolved_buffer:
+		return frappe._dict()
+	return _with_buffer_explanations(
+		refresh_buffer(resolved_buffer, persist=False, include_suggestions=include_suggestions)
+	)
+
+
+def _with_buffer_explanations(buffer) -> frappe._dict:
+	row = frappe._dict(buffer or {})
+	row.dlt_suggestion_detail = _get_dlt_suggestion_detail(row)
+	row.dlt_confidence_detail = _get_dlt_confidence_detail(row)
+	row.procurement_mismatch_detail = _get_procurement_mismatch_detail(row)
+	return row
 
 
 def _coerce_item_row(item) -> frappe._dict:
@@ -1140,10 +1191,11 @@ def _stock_buffer_console_item_fields() -> list[str]:
 		"disabled",
 		"default_warehouse",
 		"custom_mrp_use_stock_buffer",
-		"custom_mrp_default_stock_buffer",
-		"custom_mrp_lead_time_days",
-		"lead_time_days",
-		"lead_time",
+			"custom_mrp_default_stock_buffer",
+			"custom_mrp_lead_time_days",
+			"safety_stock",
+			"lead_time_days",
+			"lead_time",
 		"min_order_qty",
 		"purchase_uom",
 	):
@@ -1171,16 +1223,17 @@ def _iter_stock_buffer_console_rows(filters: dict[str, Any] | None = None, page_
 	for items in _iter_stock_buffer_console_items(filters, page_length=page_length):
 		item_codes = [row.name for row in items]
 		item_default_warehouses = _get_item_default_warehouse_map(item_codes, company)
-		buffers_by_key, default_counts = _get_console_buffer_maps(company, item_codes)
+		buffers_by_key, default_buffers_by_item = _get_console_buffer_maps(company, item_codes)
 		for item in items:
 			warehouse = _get_item_buffer_warehouse(item, company, item_default_warehouses)
 			key = (item.name, warehouse or "")
 			buffers = buffers_by_key.get(key, [])
+			default_buffers = default_buffers_by_item.get(item.name, [])
 			buffer = buffers[0] if buffers else frappe._dict()
-			status = _get_console_status(item, warehouse, buffers, default_counts.get(item.name, 0))
+			status = _get_console_status(item, warehouse, buffers, len(default_buffers))
 			if status_filter and status != status_filter:
 				continue
-			yield _make_console_row(item, company, warehouse, buffer, status)
+			yield _make_console_row(item, company, warehouse, buffer, status, buffers, default_buffers)
 
 
 def _get_console_buffer_maps(company: str | None, item_codes: list[str]):
@@ -1223,7 +1276,7 @@ def _get_console_buffer_maps(company: str | None, item_codes: list[str]):
 		if _has_field("MRP Stock Buffer", fieldname):
 			fields.append(fieldname)
 	by_key: dict[tuple[str, str], list[frappe._dict]] = {}
-	default_counts: dict[str, int] = {}
+	default_buffers_by_item: dict[str, list[frappe._dict]] = {}
 	for rows in _iter_get_all(
 		"MRP Stock Buffer",
 		filters={"active": 1, "company": company, "item_code": ["in", item_codes]},
@@ -1233,8 +1286,8 @@ def _get_console_buffer_maps(company: str | None, item_codes: list[str]):
 		for row in rows:
 			by_key.setdefault((row.item_code, row.warehouse or ""), []).append(row)
 			if cint(row.is_default_for_item):
-				default_counts[row.item_code] = default_counts.get(row.item_code, 0) + 1
-	return by_key, default_counts
+				default_buffers_by_item.setdefault(row.item_code, []).append(row)
+	return by_key, default_buffers_by_item
 
 
 def _get_console_status(item, warehouse: str | None, buffers: list[Any], default_count: int) -> str:
@@ -1267,6 +1320,129 @@ def _get_console_status(item, warehouse: str | None, buffers: list[Any], default
 	return "Active"
 
 
+def _get_console_status_detail(item, warehouse: str | None, buffer, status: str, buffers: list[Any], default_buffers: list[Any]) -> str:
+	if status == "Disabled":
+		if not _item_is_stock_enabled(item):
+			return _("Item is disabled or is not a stock item, so MRP stock buffer automation will not create or refresh a buffer.")
+		return _("Use MRP Stock Buffer is off on the Item master, so this item is excluded from buffer automation.")
+	if status == "Missing Warehouse":
+		return _("No default warehouse was found for this item and company. Maintain Item Default Warehouse before creating a stock buffer.")
+	if status == "Missing Buffer":
+		return _("The item is enabled for MRP stock buffer automation, but no active buffer exists for this company, item and warehouse.")
+	if status == "Conflict":
+		return _get_console_conflict_detail(item, warehouse, buffers, default_buffers) or _(
+			"Active stock buffer records conflict with the item default buffer setup."
+		)
+	if status == "Missing DLT":
+		return _("The buffer DLT is empty and no DLT suggestion is available. Maintain DLT manually or add a lead-time source.")
+	if status == "Review DLT":
+		return _("The buffer DLT is empty, but the system found a suggested DLT. Review the source and apply it if it is correct.")
+	if status == "Needs Refresh":
+		return _("The buffer was not calculated recently. Refresh it so on-hand stock, incoming supply and qualified demand are recalculated.")
+	if status == "DLT Mismatch":
+		return _("The maintained buffer DLT differs from the system suggested DLT. Review the source before applying the suggestion.")
+	if status == "Procurement Mismatch":
+		return _("The maintained purchase constraints differ from the system suggestions.")
+	if status == "Low Confidence":
+		return _("The suggested DLT comes from a low-confidence source and should be reviewed manually before applying.")
+	return _("No setup issue was detected for this stock buffer.")
+
+
+def _get_console_conflict_detail(item, warehouse: str | None, buffers: list[Any], default_buffers: list[Any]) -> str:
+	details = []
+	if len(buffers) > 1:
+		details.append(
+			_("Multiple active buffers exist for the same company, item and warehouse: {0}.").format(
+				_format_buffer_refs(buffers)
+			)
+		)
+	if len(default_buffers) > 1:
+		details.append(
+			_("Multiple active default buffers exist for this item: {0}.").format(
+				_format_buffer_refs(default_buffers)
+			)
+		)
+	if not buffers and default_buffers:
+		details.append(
+			_("The item default buffer exists, but not for the resolved warehouse {0}: {1}.").format(
+				warehouse or _("blank"),
+				_format_buffer_refs(default_buffers),
+			)
+		)
+	if buffers and default_buffers:
+		default_names = {row.get("name") for row in default_buffers}
+		if buffers[0].get("name") not in default_names:
+			details.append(
+				_("The buffer for the resolved warehouse is {0}, but the item default buffer is {1}.").format(
+					buffers[0].get("name"),
+					_format_buffer_refs(default_buffers),
+				)
+			)
+	return " ".join(details)
+
+
+def _format_buffer_refs(buffers: list[Any]) -> str:
+	refs = []
+	for row in buffers or []:
+		refs.append("{0} ({1})".format(row.get("name"), row.get("warehouse") or _("blank warehouse")))
+	return "; ".join(refs)
+
+
+def _get_dlt_suggestion_detail(buffer) -> str:
+	suggested_dlt = flt(buffer.get("suggested_dlt_days"))
+	source = buffer.get("suggested_dlt_source")
+	if suggested_dlt <= 0:
+		return _("No maintained DLT source was found.")
+	return _("Suggested DLT is {0} day(s), calculated from {1}.").format(
+		_format_qty(suggested_dlt),
+		source or _("an unspecified source"),
+	)
+
+
+def _get_dlt_confidence_detail(buffer) -> str:
+	confidence = buffer.get("suggested_dlt_confidence")
+	source = buffer.get("suggested_dlt_source") or ""
+	if not confidence:
+		return _("No confidence rating is available because no DLT suggestion was found.")
+	if confidence == SUGGESTION_HIGH:
+		return _(
+			"High confidence means the source is specific to this item or matched supplier, such as an item-specific supply rule or supplier quotation."
+		)
+	if confidence == SUGGESTION_MEDIUM:
+		return _(
+			"Medium confidence means the source is maintained but less direct, such as item lead time, a broader supply rule, supplier item price, or enough purchase history."
+		)
+	if confidence == SUGGESTION_LOW:
+		if "Purchase Order History" in source:
+			return _("Low confidence means the purchase history sample is small. Review the suggested DLT before applying it.")
+		return _("Low confidence means the source is generic, missing supplier context, or no maintained lead-time source was found.")
+	return _("Review the DLT suggestion before applying it.")
+
+
+def _get_procurement_mismatch_detail(buffer) -> str:
+	parts = []
+	if _has_meaningful_suggestion_diff(buffer.get("min_order_qty"), buffer.get("suggested_min_order_qty")):
+		parts.append(
+			_("Minimum Order Qty is {0}, but the suggested value is {1}.").format(
+				_format_qty(buffer.get("min_order_qty")),
+				_format_qty(buffer.get("suggested_min_order_qty")),
+			)
+		)
+	if _has_meaningful_suggestion_diff(buffer.get("order_multiple_qty"), buffer.get("suggested_order_multiple_qty")):
+		parts.append(
+			_("Order Multiple Qty is {0}, but the suggested value is {1}.").format(
+				_format_qty(buffer.get("order_multiple_qty")),
+				_format_qty(buffer.get("suggested_order_multiple_qty")),
+			)
+		)
+	return " ".join(parts) or _("Maintained procurement constraints currently match the available suggestions.")
+
+
+def _format_qty(value) -> str:
+	text = f"{flt(value):.6f}".rstrip("0").rstrip(".")
+	return text or "0"
+
+
 def _buffer_needs_refresh(buffer) -> bool:
 	last_calculated_on = buffer.get("last_calculated_on")
 	if not last_calculated_on:
@@ -1278,7 +1454,17 @@ def _buffer_needs_refresh(buffer) -> bool:
 	return age_hours > BUFFER_REFRESH_STALE_HOURS
 
 
-def _make_console_row(item, company: str | None, warehouse: str | None, buffer, status: str) -> frappe._dict:
+def _make_console_row(
+	item,
+	company: str | None,
+	warehouse: str | None,
+	buffer,
+	status: str,
+	buffers: list[Any] | None = None,
+	default_buffers: list[Any] | None = None,
+) -> frappe._dict:
+	buffers = buffers or []
+	default_buffers = default_buffers or []
 	return frappe._dict(
 		{
 			"name": item.name,
@@ -1286,11 +1472,18 @@ def _make_console_row(item, company: str | None, warehouse: str | None, buffer, 
 			"item_name": item.get("item_name"),
 			"item_group": item.get("item_group"),
 			"stock_uom": item.get("stock_uom"),
+			"item_safety_stock": flt(item.get("safety_stock")),
 			"company": company,
 			"warehouse": warehouse,
 			"use_stock_buffer": cint(item.get("custom_mrp_use_stock_buffer")),
 			"status": status,
+			"status_detail": _get_console_status_detail(item, warehouse, buffer, status, buffers, default_buffers),
+			"conflict_detail": _get_console_conflict_detail(item, warehouse, buffers, default_buffers),
 			"stock_buffer": buffer.get("name"),
+			"active_buffer_count": len(buffers),
+			"active_buffer_detail": _format_buffer_refs(buffers),
+			"default_buffer_count": len(default_buffers),
+			"default_buffer_detail": _format_buffer_refs(default_buffers),
 			"buffer_priority": buffer.get("planning_priority"),
 			"buffer_nfp_percent": flt(buffer.get("net_flow_position_percent")),
 			"buffer_recommended_qty": flt(buffer.get("recommended_qty")),
@@ -1310,6 +1503,9 @@ def _make_console_row(item, company: str | None, warehouse: str | None, buffer, 
 			"suggested_order_multiple_qty": flt(buffer.get("suggested_order_multiple_qty")),
 			"suggestions_calculated_on": buffer.get("suggestions_calculated_on"),
 			"suggestion_notes": buffer.get("suggestion_notes"),
+			"dlt_suggestion_detail": _get_dlt_suggestion_detail(buffer),
+			"dlt_confidence_detail": _get_dlt_confidence_detail(buffer),
+			"procurement_mismatch_detail": _get_procurement_mismatch_detail(buffer),
 			"adu": flt(buffer.get("adu")),
 			"red_zone_qty": flt(buffer.get("red_zone_qty")),
 			"yellow_zone_qty": flt(buffer.get("yellow_zone_qty")),
@@ -1645,6 +1841,15 @@ def _sync_standard_item_lead_time_enabled() -> bool:
 		return False
 	try:
 		return bool(cint(frappe.db.get_single_value("MRP Settings", "sync_buffer_dlt_to_item_lead_time")))
+	except Exception:
+		return False
+
+
+def _sync_item_safety_stock_enabled() -> bool:
+	if not _has_field("MRP Settings", "sync_buffer_safety_stock_to_item"):
+		return False
+	try:
+		return bool(cint(frappe.db.get_single_value("MRP Settings", "sync_buffer_safety_stock_to_item")))
 	except Exception:
 		return False
 

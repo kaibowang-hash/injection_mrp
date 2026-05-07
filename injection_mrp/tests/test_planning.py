@@ -432,10 +432,47 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertEqual(calls[0][2]["custom_mrp_lead_time_days"], 18)
 		self.assertEqual(calls[1][2]["lead_time_days"], 18)
 
+	def test_default_buffer_sync_writes_item_safety_stock_from_top_of_red_when_enabled(self):
+		original_doctype_exists = stock_buffer._doctype_exists
+		original_has_field = stock_buffer._has_field
+		original_sync_safety_enabled = stock_buffer._sync_item_safety_stock_enabled
+		original_db = stock_buffer.frappe.db
+		calls = []
+		buffer = frappe._dict(
+			{
+				"name": "MRP-BUF-001",
+				"active": 1,
+				"is_default_for_item": 1,
+				"item_code": "RM-001",
+				"dlt_days": 18,
+				"top_of_red": 125.5,
+			}
+		)
+
+		try:
+			stock_buffer._doctype_exists = lambda doctype: doctype == "Item"
+			stock_buffer._has_field = lambda doctype, fieldname: doctype == "Item" and fieldname in {
+				"custom_mrp_default_stock_buffer",
+				"custom_mrp_lead_time_days",
+				"safety_stock",
+			}
+			stock_buffer._sync_item_safety_stock_enabled = lambda: True
+			stock_buffer.frappe.db = frappe._dict({"set_value": lambda doctype, name, values: calls.append((doctype, name, dict(values)))})
+
+			stock_buffer.sync_default_buffer_to_item(buffer)
+		finally:
+			stock_buffer._doctype_exists = original_doctype_exists
+			stock_buffer._has_field = original_has_field
+			stock_buffer._sync_item_safety_stock_enabled = original_sync_safety_enabled
+			stock_buffer.frappe.db = original_db
+
+		self.assertEqual(calls[0][2]["safety_stock"], 125.5)
+
 	def test_default_buffer_sync_clears_item_when_buffer_stops_controlling(self):
 		original_doctype_exists = stock_buffer._doctype_exists
 		original_has_field = stock_buffer._has_field
 		original_sync_enabled = stock_buffer._sync_standard_item_lead_time_enabled
+		original_sync_safety_enabled = stock_buffer._sync_item_safety_stock_enabled
 		original_db = stock_buffer.frappe.db
 		calls = []
 
@@ -448,6 +485,7 @@ class TestPlanningHelpers(unittest.TestCase):
 						"is_default_for_item": 1,
 						"item_code": "RM-001",
 						"dlt_days": 18,
+						"top_of_red": 125.5,
 					}
 				)
 
@@ -467,6 +505,7 @@ class TestPlanningHelpers(unittest.TestCase):
 					"custom_mrp_default_stock_buffer": "MRP-BUF-001",
 					"custom_mrp_lead_time_days": 18,
 					"lead_time_days": 18,
+					"safety_stock": 125.5,
 				}
 			)
 
@@ -476,8 +515,10 @@ class TestPlanningHelpers(unittest.TestCase):
 				"custom_mrp_default_stock_buffer",
 				"custom_mrp_lead_time_days",
 				"lead_time_days",
+				"safety_stock",
 			}
 			stock_buffer._sync_standard_item_lead_time_enabled = lambda: True
+			stock_buffer._sync_item_safety_stock_enabled = lambda: True
 			stock_buffer.frappe.db = frappe._dict(
 				{
 					"get_value": fake_get_value,
@@ -490,11 +531,13 @@ class TestPlanningHelpers(unittest.TestCase):
 			stock_buffer._doctype_exists = original_doctype_exists
 			stock_buffer._has_field = original_has_field
 			stock_buffer._sync_standard_item_lead_time_enabled = original_sync_enabled
+			stock_buffer._sync_item_safety_stock_enabled = original_sync_safety_enabled
 			stock_buffer.frappe.db = original_db
 
 		self.assertEqual(calls[0][2]["custom_mrp_default_stock_buffer"], None)
 		self.assertEqual(calls[0][2]["custom_mrp_lead_time_days"], 0)
 		self.assertEqual(calls[0][2]["lead_time_days"], 0)
+		self.assertEqual(calls[0][2]["safety_stock"], 0)
 
 	def test_stock_buffer_console_statuses_are_foolproof(self):
 		original_has_field = stock_buffer._has_field

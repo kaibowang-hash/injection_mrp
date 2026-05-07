@@ -93,6 +93,17 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 			{ label: __("Delta"), fieldname: "delta_net_qty", formatter: ui.format_number },
 		];
 		const bufferRows = data.buffer_rows || [];
+		const bufferColumns = [
+			{ label: __("Item"), fieldname: "item_code", formatter: (value, buffer) => ui.item_cell(value, buffer.item_name) },
+			{ label: __("Buffer"), fieldname: "stock_buffer", formatter: (value) => (value ? ui.doc_link("MRP Stock Buffer", value) : "") },
+			{ label: __("Warehouse"), fieldname: "warehouse" },
+			{ label: __("Priority"), fieldname: "buffer_priority", formatter: (value, buffer) => ui.code_badge(value || buffer.planning_priority, { kind: "warning" }) },
+			{ label: __("NFP %"), fieldname: "buffer_nfp_percent", formatter: (value) => `${ui.format_number(value, 2)}%` },
+			{ label: __("Recommended Qty"), fieldname: "buffer_recommended_qty", formatter: ui.format_number },
+			{ label: __("Current Net"), fieldname: "current_net_qty", formatter: ui.format_number },
+			{ label: __("Planned", null, "Injection MRP"), fieldname: "current_new_supply_qty", formatter: ui.format_number },
+			{ label: __("Suggested Order Date"), fieldname: "suggested_order_date", formatter: ui.format_date },
+		];
 		ui.open_drawer(row.name, [
 			{
 				title: __("Run Comparison"),
@@ -103,39 +114,14 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 				],
 			},
 			{
-				title: __("Stock Buffer"),
-				html: bufferRows.length
-					? `<div class="imrp-run-buffer-list">${bufferRows.map(render_buffer_drawer_item).join("")}</div>`
-					: `<div class="ia-muted">${__("No stock buffer data found.")}</div>`,
+				title: __("Top Critical Buffers"),
+				html: ui.mini_table_html(bufferColumns, bufferRows, __("No stock buffer data found.")),
 			},
 			{
 				title: __("Requirement Changes"),
 				html: ui.mini_table_html(comparisonColumns, data.rows || [], __("No comparable requirements found.")),
 			},
 		]);
-	}
-
-	function render_buffer_drawer_item(buffer) {
-		return `
-			<div class="imrp-run-buffer-item">
-				<div class="imrp-run-buffer-head">
-					${ui.item_cell(buffer.item_code, buffer.item_name)}
-					<div class="imrp-run-buffer-tags">
-						${buffer.stock_buffer ? ui.doc_link("MRP Stock Buffer", buffer.stock_buffer) : ""}
-						${ui.code_badge(buffer.buffer_priority || buffer.planning_priority, { kind: "warning" })}
-					</div>
-				</div>
-				${ui.buffer_chart_html(buffer)}
-				<div class="imrp-run-buffer-meta">
-					<span>${__("Warehouse")}: <b>${ui.escape(buffer.warehouse || "-")}</b></span>
-					<span>${__("Requirement Count")}: <b>${ui.format_number(buffer.requirement_count, 0)}</b></span>
-					<span>${__("Current Net")}: <b>${ui.format_number(buffer.current_net_qty)}</b></span>
-					<span>${__("Planned", null, "Injection MRP")}: <b>${ui.format_number(buffer.current_new_supply_qty)}</b></span>
-					<span>${__("Buffer Lead Time Days")}: <b>${ui.format_number(buffer.buffer_lead_time_days, 0)}</b></span>
-					<span>${__("Suggested Order Date")}: <b>${ui.format_date(buffer.suggested_order_date)}</b></span>
-				</div>
-			</div>
-		`;
 	}
 
 	function open_run_dialog(method, title) {
