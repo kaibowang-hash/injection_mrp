@@ -185,11 +185,20 @@ def get_stock_buffer_console_data(
 ) -> dict[str, Any]:
 	filters = filters or {}
 	limit_start, limit_page_length = _pagination_args(limit_start, limit_page_length, 500)
-	rows = list(_iter_stock_buffer_console_rows(filters))
-	total_count = len(rows)
-	page_rows = rows[limit_start : limit_start + limit_page_length]
+	total_count = 0
+	enabled_count = 0
+	status_counts: dict[str, int] = {}
+	page_rows = []
+	limit_end = limit_start + limit_page_length
+	for item, company, warehouse, buffer, status, buffers, default_buffers in _iter_stock_buffer_console_contexts(filters):
+		if cint(item.get("custom_mrp_use_stock_buffer")):
+			enabled_count += 1
+		status_counts[status] = status_counts.get(status, 0) + 1
+		if limit_start <= total_count < limit_end:
+			page_rows.append(_make_console_row(item, company, warehouse, buffer, status, buffers, default_buffers))
+		total_count += 1
 	return {
-		"cards": _stock_buffer_console_cards(rows),
+		"cards": _stock_buffer_console_cards_from_counts(status_counts, enabled_count),
 		"rows": page_rows,
 		"pagination": _pagination_meta(total_count, limit_start, limit_page_length, len(page_rows)),
 	}
@@ -1217,6 +1226,11 @@ def _iter_stock_buffer_console_items(filters: dict[str, Any], page_length: int =
 
 
 def _iter_stock_buffer_console_rows(filters: dict[str, Any] | None = None, page_length: int = BULK_PAGE_LENGTH):
+	for item, company, warehouse, buffer, status, buffers, default_buffers in _iter_stock_buffer_console_contexts(filters, page_length=page_length):
+		yield _make_console_row(item, company, warehouse, buffer, status, buffers, default_buffers)
+
+
+def _iter_stock_buffer_console_contexts(filters: dict[str, Any] | None = None, page_length: int = BULK_PAGE_LENGTH):
 	filters = filters or {}
 	company = filters.get("company") or _get_default_buffer_company()
 	status_filter = filters.get("status")
@@ -1233,7 +1247,7 @@ def _iter_stock_buffer_console_rows(filters: dict[str, Any] | None = None, page_
 			status = _get_console_status(item, warehouse, buffers, len(default_buffers))
 			if status_filter and status != status_filter:
 				continue
-			yield _make_console_row(item, company, warehouse, buffer, status, buffers, default_buffers)
+			yield item, company, warehouse, buffer, status, buffers, default_buffers
 
 
 def _get_console_buffer_maps(company: str | None, item_codes: list[str]):
@@ -1526,8 +1540,12 @@ def _stock_buffer_console_cards(rows: list[Any]) -> list[dict[str, Any]]:
 	counts: dict[str, int] = {}
 	for row in rows:
 		counts[row.status] = counts.get(row.status, 0) + 1
+	return _stock_buffer_console_cards_from_counts(counts, sum(1 for row in rows if row.use_stock_buffer))
+
+
+def _stock_buffer_console_cards_from_counts(counts: dict[str, int], enabled_count: int) -> list[dict[str, Any]]:
 	return [
-		{"label": _("Enabled Items"), "value": sum(1 for row in rows if row.use_stock_buffer)},
+		{"label": _("Enabled Items"), "value": cint(enabled_count)},
 		{"label": _("Active Buffers"), "value": counts.get("Active", 0)},
 		{"label": _("Missing Buffers"), "value": counts.get("Missing Buffer", 0)},
 		{"label": _("Needs Refresh"), "value": counts.get("Needs Refresh", 0)},
@@ -1819,7 +1837,7 @@ def _get_profile_values(profile_name: str | None) -> frappe._dict:
 	)
 
 
-def _runtime_cache() -> dict[tuple[str, str, str], frappe._dict]:
+def _runtime_cache() -> dict[tuple[str, str, str], Any]:
 	try:
 		if not hasattr(frappe.local, "injection_mrp_stock_buffer_cache"):
 			frappe.local.injection_mrp_stock_buffer_cache = {}
@@ -1875,16 +1893,32 @@ def _first_field(doctype: str, fieldnames: tuple[str, ...]) -> str | None:
 
 
 def _doctype_exists(doctype: str) -> bool:
-	try:
-		return bool(frappe.db.exists("DocType", doctype))
-	except Exception:
-		return False
+	cache = _runtime_cache()
+	cache_key = ("__doctype_exists__", doctype, "")
+	if cache_key not in cache:
+		try:
+			frappe.get_meta(doctype)
+			cache[cache_key] = True
+		except Exception:
+			try:
+				cache[cache_key] = bool(frappe.db.exists("DocType", doctype))
+			except Exception:
+				cache[cache_key] = False
+	return bool(cache[cache_key])
 
 
 def _has_field(doctype: str, fieldname: str) -> bool:
-	if not _doctype_exists(doctype):
-		return False
-	try:
-		return frappe.get_meta(doctype).has_field(fieldname)
-	except Exception:
-		return False
+	cache = _runtime_cache()
+	fields_key = ("__fieldnames__", doctype, "")
+	cache_key = ("__has_field__", doctype, fieldname)
+	if cache_key not in cache:
+		if not _doctype_exists(doctype):
+			cache[cache_key] = False
+		else:
+			try:
+				if fields_key not in cache:
+					cache[fields_key] = frozenset(df.fieldname for df in frappe.get_meta(doctype).fields)
+				cache[cache_key] = fieldname in cache[fields_key]
+			except Exception:
+				cache[cache_key] = False
+	return bool(cache[cache_key])

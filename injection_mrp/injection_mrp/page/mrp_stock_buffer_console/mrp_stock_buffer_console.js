@@ -7,7 +7,7 @@ frappe.pages["mrp-stock-buffer-console"].on_page_load = function (wrapper) {
 	const ui = injection_mrp.ui;
 	const shell = ui.make_shell(page, __("MRP Stock Buffer Console"), __("Create, refresh and review item-driven stock buffers."));
 	const filters = {};
-	const pageState = { limit_start: 0, limit_page_length: 500 };
+	const pageState = { limit_start: 0, limit_page_length: 100 };
 	let rows = [];
 	const statusTone = {
 		Active: "green",
