@@ -152,6 +152,7 @@ def get_settings_dict() -> frappe._dict:
 				if settings.get("use_stock_buffer_for_safety_stock") is None
 				else cint(settings.get("use_stock_buffer_for_safety_stock"))
 			),
+			"sync_buffer_safety_stock_to_item": cint(settings.get("sync_buffer_safety_stock_to_item")),
 			"sync_buffer_dlt_to_item_lead_time": cint(settings.get("sync_buffer_dlt_to_item_lead_time")),
 			"use_material_need_date_for_pegging": cint(settings.use_material_need_date_for_pegging),
 			"rolling_daily_horizon_days": cint(settings.get("rolling_daily_horizon_days")) or 60,

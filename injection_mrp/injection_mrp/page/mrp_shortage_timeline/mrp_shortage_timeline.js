@@ -44,9 +44,21 @@ frappe.pages["mrp-shortage-timeline"].on_page_load = function (wrapper) {
 		{ label: __("Safety Gap"), fieldname: "safety_stock_gap_qty", numeric: true, formatter: ui.format_number },
 	];
 
-	function open_alert(row) {
+	async function open_alert(row) {
 		if (!row) {
 			return;
+		}
+		let bufferState = null;
+		try {
+			bufferState = await ui.with_busy(__("Loading stock buffer..."), () =>
+				ui.xcall("injection_mrp.api.app.get_stock_buffer_chart_data", {
+					item_code: row.item_code,
+					company: row.company,
+					warehouse: row.warehouse,
+				})
+			);
+		} catch (error) {
+			console.warn("Unable to load stock buffer chart data", error);
 		}
 		const affected = JSON.parse(row.affected_requirements || "[]");
 		const affectedColumns = [
@@ -70,6 +82,12 @@ frappe.pages["mrp-shortage-timeline"].on_page_load = function (wrapper) {
 					{ label: __("Lowest Projected"), value: ui.format_number(row.lowest_projected_qty) },
 					{ label: __("Latest Order Date"), value: ui.format_date(row.latest_order_date) },
 				],
+			},
+			{
+				title: __("Stock Buffer"),
+				html: bufferState
+					? ui.buffer_chart_html(bufferState)
+					: `<div class="ia-muted">${__("Could not load live stock buffer values.")}</div>`,
 			},
 			{
 				title: __("Affected Requirements"),

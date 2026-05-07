@@ -43,6 +43,12 @@ def ensure_default_settings():
 			if settings.use_stock_buffer_for_safety_stock is None
 			else settings.use_stock_buffer_for_safety_stock
 		)
+	if settings.meta.has_field("sync_buffer_safety_stock_to_item"):
+		settings.sync_buffer_safety_stock_to_item = (
+			1
+			if settings.sync_buffer_safety_stock_to_item is None
+			else settings.sync_buffer_safety_stock_to_item
+		)
 	if settings.meta.has_field("sync_buffer_dlt_to_item_lead_time"):
 		settings.sync_buffer_dlt_to_item_lead_time = (
 			0

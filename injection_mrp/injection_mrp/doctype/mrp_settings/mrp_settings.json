@@ -18,6 +18,7 @@
   "late_supply_tolerance_days",
   "warn_missing_lead_time",
   "use_stock_buffer_for_safety_stock",
+  "sync_buffer_safety_stock_to_item",
   "sync_buffer_dlt_to_item_lead_time",
   "use_material_need_date_for_pegging",
   "rolling_daily_horizon_days",
@@ -108,6 +109,13 @@
    "fieldname": "use_stock_buffer_for_safety_stock",
    "fieldtype": "Check",
    "label": "Use Stock Buffer for Safety Stock"
+  },
+  {
+   "default": "1",
+   "description": "Sync the default stock buffer Top of Red to Item Safety Stock.",
+   "fieldname": "sync_buffer_safety_stock_to_item",
+   "fieldtype": "Check",
+   "label": "Sync Buffer Safety Stock to Item Safety Stock"
   },
   {
    "default": "0",

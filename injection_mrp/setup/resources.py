@@ -17,7 +17,7 @@ STANDARD_CUSTOM_FIELDS = {
 			"insert_after": "custom_mrp_use_stock_buffer",
 			"read_only": 1,
 			"no_copy": 1,
-			"description": "Owned by Injection MRP. Default buffer controls MRP lead time.",
+			"description": "Owned by Injection MRP. Default buffer controls MRP lead time and safety stock.",
 		},
 		{
 			"fieldname": "custom_mrp_lead_time_days",
