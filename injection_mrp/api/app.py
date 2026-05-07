@@ -210,9 +210,7 @@ def recalculate_stock_buffers(company=None, item_code=None, warehouse=None, item
 	parsed_filters = _parse_json(filters)
 	parsed_item_codes = _parse_json(item_codes) if isinstance(item_codes, str) else item_codes
 	if parsed_filters and not parsed_item_codes and not item_code and not warehouse:
-		console_data = stock_buffer.get_stock_buffer_console_data(parsed_filters, limit_start=0, limit_page_length=10000)
-		parsed_item_codes = [row.item_code for row in console_data.get("rows", []) if row.get("stock_buffer")]
-		company = company or parsed_filters.get("company")
+		return stock_buffer.refresh_stock_buffer_console_selection(parsed_filters)
 	return stock_buffer.refresh_active_stock_buffers(
 		company=company,
 		item_code=item_code,
@@ -227,6 +225,7 @@ def create_missing_stock_buffers(filters=None, item_codes=None):
 	return stock_buffer.create_missing_stock_buffers(
 		_parse_json(filters),
 		_parse_json(item_codes) if isinstance(item_codes, str) else item_codes,
+		ignore_permissions=False,
 	)
 
 

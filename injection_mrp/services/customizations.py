@@ -103,8 +103,11 @@ def ensure_stock_buffer_item_defaults():
 def _standard_custom_fields_for_site():
 	fields = {doctype: [dict(field) for field in field_list] for doctype, field_list in STANDARD_CUSTOM_FIELDS.items()}
 	item_fields = fields.get("Item") or []
-	if item_fields and not _has_field("Item", "lead_time_days"):
-		item_fields[0]["insert_after"] = "safety_stock" if _has_field("Item", "safety_stock") else "reorder_levels"
+	if item_fields and not _has_field("Item", item_fields[0].get("insert_after")):
+		for anchor in ("lead_time_days", "safety_stock", "reorder_levels", "item_group"):
+			if _has_field("Item", anchor):
+				item_fields[0]["insert_after"] = anchor
+				break
 	return fields
 
 

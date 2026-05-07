@@ -16,6 +16,7 @@ DEFAULT_ADU_METHOD = "Past Actual"
 DEFAULT_ADU_PAST_DAYS = 90
 BUFFER_ITEM_GROUP_ROOTS = ("Raw-material", "Packaging")
 BUFFER_REFRESH_STALE_HOURS = 24
+BULK_PAGE_LENGTH = 1000
 SUGGESTION_HIGH = "High"
 SUGGESTION_MEDIUM = "Medium"
 SUGGESTION_LOW = "Low"
@@ -184,22 +185,7 @@ def get_stock_buffer_console_data(
 ) -> dict[str, Any]:
 	filters = filters or {}
 	limit_start, limit_page_length = _pagination_args(limit_start, limit_page_length, 500)
-	company = filters.get("company") or _get_default_buffer_company()
-	items = _get_stock_buffer_console_items(filters)
-	item_codes = [row.name for row in items]
-	item_default_warehouses = _get_item_default_warehouse_map(item_codes, company)
-	buffers_by_key, default_counts = _get_console_buffer_maps(company, item_codes)
-	rows = []
-	for item in items:
-		warehouse = _get_item_buffer_warehouse(item, company, item_default_warehouses)
-		key = (item.name, warehouse or "")
-		buffers = buffers_by_key.get(key, [])
-		buffer = buffers[0] if buffers else frappe._dict()
-		status = _get_console_status(item, warehouse, buffers, default_counts.get(item.name, 0))
-		rows.append(_make_console_row(item, company, warehouse, buffer, status))
-
-	if filters.get("status"):
-		rows = [row for row in rows if row.status == filters.get("status")]
+	rows = list(_iter_stock_buffer_console_rows(filters))
 	total_count = len(rows)
 	page_rows = rows[limit_start : limit_start + limit_page_length]
 	return {
@@ -209,14 +195,17 @@ def get_stock_buffer_console_data(
 	}
 
 
-def create_missing_stock_buffers(filters: dict[str, Any] | None = None, item_codes: list[str] | None = None) -> dict[str, Any]:
+def create_missing_stock_buffers(
+	filters: dict[str, Any] | None = None,
+	item_codes: list[str] | None = None,
+	ignore_permissions: bool = False,
+) -> dict[str, Any]:
 	filters = filters or {}
-	data = get_stock_buffer_console_data(filters, limit_start=0, limit_page_length=10000)
 	item_set = set(item_codes or [])
 	created = []
 	skipped = []
 	errors = []
-	for row in data.get("rows", []):
+	for row in _iter_stock_buffer_console_rows(filters):
 		if item_set and row.item_code not in item_set:
 			continue
 		if row.status != "Missing Buffer":
@@ -227,7 +216,7 @@ def create_missing_stock_buffers(filters: dict[str, Any] | None = None, item_cod
 				row.item_code,
 				company=row.company,
 				warehouse=row.warehouse,
-				ignore_permissions=True,
+				ignore_permissions=ignore_permissions,
 			)
 			if buffer:
 				created.append({"item_code": row.item_code, "stock_buffer": buffer.name})
@@ -249,12 +238,11 @@ def apply_stock_buffer_suggestions(
 	if not _doctype_exists("MRP Stock Buffer"):
 		return {"updated": 0, "skipped": 0, "failed": 0, "rows": [], "errors": []}
 	filters = filters or {}
-	data = get_stock_buffer_console_data(filters, limit_start=0, limit_page_length=10000)
 	item_set = set(item_codes or [])
 	updated = []
 	skipped = []
 	errors = []
-	for row in data.get("rows", []):
+	for row in _iter_stock_buffer_console_rows(filters):
 		if item_set and row.item_code not in item_set:
 			continue
 		if not row.get("stock_buffer"):
@@ -302,17 +290,44 @@ def apply_stock_buffer_item_group_defaults(
 	fields = ["name", "item_group"]
 	if _has_field("Item", "is_stock_item"):
 		fields.append("is_stock_item")
-	items = frappe.get_all("Item", filters=query_filters, fields=fields, limit_page_length=10000)
+	if _has_field("Item", "disabled"):
+		fields.append("disabled")
 	updated = enabled = disabled = 0
-	for item in items:
-		value = 1 if _item_is_stock_enabled(item) and _item_group_defaults_to_stock_buffer(item.item_group) else 0
-		frappe.db.set_value("Item", item.name, "custom_mrp_use_stock_buffer", value, update_modified=False)
-		updated += 1
-		if value:
-			enabled += 1
-		else:
-			disabled += 1
+	for items in _iter_get_all("Item", filters=query_filters, fields=fields, order_by="name asc"):
+		for item in items:
+			value = 1 if _item_is_stock_enabled(item) and _item_group_defaults_to_stock_buffer(item.item_group) else 0
+			frappe.db.set_value("Item", item.name, "custom_mrp_use_stock_buffer", value, update_modified=False)
+			updated += 1
+			if value:
+				enabled += 1
+			else:
+				disabled += 1
 	return {"updated": updated, "enabled": enabled, "disabled": disabled}
+
+
+def _iter_get_all(
+	doctype: str,
+	filters: dict[str, Any] | None = None,
+	fields: list[str] | None = None,
+	order_by: str | None = None,
+	page_length: int = BULK_PAGE_LENGTH,
+):
+	limit_start = 0
+	while True:
+		rows = frappe.get_all(
+			doctype,
+			filters=filters,
+			fields=fields,
+			order_by=order_by,
+			limit_start=limit_start,
+			limit_page_length=page_length,
+		)
+		if not rows:
+			break
+		yield rows
+		if len(rows) < page_length:
+			break
+		limit_start += len(rows)
 
 
 def refresh_active_stock_buffers(
@@ -323,7 +338,7 @@ def refresh_active_stock_buffers(
 	ignore_permissions: bool = False,
 ) -> dict[str, Any]:
 	if not _doctype_exists("MRP Stock Buffer"):
-		return {"count": 0, "refreshed": 0, "failed": 0, "buffers": [], "errors": []}
+		return {"count": 0, "refreshed": 0, "skipped": 0, "failed": 0, "buffers": [], "skipped_rows": [], "errors": []}
 	filters: dict[str, Any] = {"active": 1}
 	if company:
 		filters["company"] = company
@@ -333,23 +348,75 @@ def refresh_active_stock_buffers(
 		filters["item_code"] = ["in", item_codes]
 	if warehouse:
 		filters["warehouse"] = warehouse
-	rows = frappe.get_all("MRP Stock Buffer", filters=filters, fields=["name"], limit_page_length=10000)
 	buffers = []
+	skipped = []
 	errors = []
-	for row in rows:
+	count = 0
+	for rows in _iter_get_all(
+		"MRP Stock Buffer",
+		filters=filters,
+		fields=["name", "item_code"],
+		order_by="name asc",
+	):
+		for row in rows:
+			count += 1
+			if row.item_code and not _item_code_is_stock_enabled(row.item_code):
+				skipped.append({"stock_buffer": row.name, "item_code": row.item_code, "status": "Disabled Item"})
+				continue
+			try:
+				doc = frappe.get_doc("MRP Stock Buffer", row.name)
+				if not ignore_permissions:
+					doc.check_permission("write")
+				buffers.append(refresh_buffer(doc, persist=True, ignore_permissions=ignore_permissions))
+			except Exception as exc:
+				errors.append({"stock_buffer": row.name, "message": str(exc)})
+				frappe.log_error(frappe.get_traceback(), _("MRP Stock Buffer refresh failed"))
+	return {
+		"count": count,
+		"refreshed": len(buffers),
+		"skipped": len(skipped),
+		"failed": len(errors),
+		"buffers": buffers,
+		"skipped_rows": skipped,
+		"errors": errors,
+	}
+
+
+def refresh_stock_buffer_console_selection(filters: dict[str, Any] | None = None, ignore_permissions: bool = False) -> dict[str, Any]:
+	if not _doctype_exists("MRP Stock Buffer"):
+		return {"count": 0, "refreshed": 0, "skipped": 0, "failed": 0, "buffers": [], "skipped_rows": [], "errors": []}
+	filters = filters or {}
+	buffers = []
+	skipped = []
+	errors = []
+	count = 0
+	seen: set[str] = set()
+	for row in _iter_stock_buffer_console_rows(filters):
+		if not row.get("stock_buffer"):
+			skipped.append({"item_code": row.item_code, "status": row.status})
+			continue
+		if row.stock_buffer in seen:
+			continue
+		seen.add(row.stock_buffer)
+		count += 1
+		if row.item_code and not _item_code_is_stock_enabled(row.item_code):
+			skipped.append({"stock_buffer": row.stock_buffer, "item_code": row.item_code, "status": "Disabled Item"})
+			continue
 		try:
-			doc = frappe.get_doc("MRP Stock Buffer", row.name)
+			doc = frappe.get_doc("MRP Stock Buffer", row.stock_buffer)
 			if not ignore_permissions:
 				doc.check_permission("write")
 			buffers.append(refresh_buffer(doc, persist=True, ignore_permissions=ignore_permissions))
 		except Exception as exc:
-			errors.append({"stock_buffer": row.name, "message": str(exc)})
+			errors.append({"stock_buffer": row.stock_buffer, "message": str(exc)})
 			frappe.log_error(frappe.get_traceback(), _("MRP Stock Buffer refresh failed"))
 	return {
-		"count": len(rows),
+		"count": count,
 		"refreshed": len(buffers),
+		"skipped": len(skipped),
 		"failed": len(errors),
 		"buffers": buffers,
+		"skipped_rows": skipped,
 		"errors": errors,
 	}
 
@@ -364,18 +431,19 @@ def collect_buffer_top_up_demands(run, persist: bool = False) -> list[frappe._di
 	if getattr(run, "warehouse", None):
 		filters["warehouse"] = run.warehouse
 
-	buffers = frappe.get_all(
+	demands = []
+	for buffers in _iter_get_all(
 		"MRP Stock Buffer",
 		filters=filters,
-		fields=["name"],
+		fields=["name", "item_code"],
 		order_by="item_code asc, warehouse asc",
-		limit_page_length=10000,
-	)
-	demands = []
-	for row in buffers:
-		state = refresh_buffer(row.name, run=run, persist=persist, ignore_permissions=True)
-		if flt(state.recommended_qty) > 0:
-			demands.append(state)
+	):
+		for row in buffers:
+			if row.item_code and not _item_code_is_stock_enabled(row.item_code):
+				continue
+			state = refresh_buffer(row.name, run=run, persist=persist, ignore_permissions=True)
+			if flt(state.recommended_qty) > 0:
+				demands.append(state)
 	return demands
 
 
@@ -400,6 +468,8 @@ def get_buffer_state_for_item(
 
 def get_buffer_name_for_item(item_code: str, company: str | None, warehouse: str | None = None) -> str | None:
 	if not item_code or not company or not _doctype_exists("MRP Stock Buffer"):
+		return None
+	if not _item_code_is_stock_enabled(item_code):
 		return None
 
 	if warehouse:
@@ -618,9 +688,24 @@ def calculate_procurement_suggestions(buffer) -> frappe._dict:
 
 
 def sync_default_buffer_to_item(buffer) -> None:
-	if not cint(buffer.get("active")) or not cint(buffer.get("is_default_for_item")) or not buffer.get("item_code"):
-		return
 	if not _doctype_exists("Item"):
+		return
+
+	before = buffer.get_doc_before_save() if callable(getattr(buffer, "get_doc_before_save", None)) else None
+	if before and cint(before.get("active")) and cint(before.get("is_default_for_item")):
+		still_controls_same_item = (
+			cint(buffer.get("active"))
+			and cint(buffer.get("is_default_for_item"))
+			and buffer.get("item_code") == before.get("item_code")
+		)
+		if not still_controls_same_item:
+			_clear_default_buffer_from_item(
+				before.get("item_code"),
+				before.get("name"),
+				before.get("dlt_days"),
+			)
+
+	if not cint(buffer.get("active")) or not cint(buffer.get("is_default_for_item")) or not buffer.get("item_code"):
 		return
 
 	values: dict[str, Any] = {}
@@ -632,6 +717,33 @@ def sync_default_buffer_to_item(buffer) -> None:
 		values["lead_time_days"] = cint(buffer.get("dlt_days"))
 	if values:
 		frappe.db.set_value("Item", buffer.item_code, values)
+
+
+def _clear_default_buffer_from_item(item_code: str | None, buffer_name: str | None, dlt_days: float | int | None = None) -> None:
+	if not item_code or not buffer_name:
+		return
+	fields = []
+	for fieldname in ("custom_mrp_default_stock_buffer", "custom_mrp_lead_time_days", "lead_time_days"):
+		if _has_field("Item", fieldname):
+			fields.append(fieldname)
+	if not fields:
+		return
+	item = frappe.db.get_value("Item", item_code, fields, as_dict=True) or {}
+	if item.get("custom_mrp_default_stock_buffer") != buffer_name:
+		return
+	values: dict[str, Any] = {}
+	if _has_field("Item", "custom_mrp_default_stock_buffer"):
+		values["custom_mrp_default_stock_buffer"] = None
+	if _has_field("Item", "custom_mrp_lead_time_days"):
+		values["custom_mrp_lead_time_days"] = 0
+	if (
+		_sync_standard_item_lead_time_enabled()
+		and _has_field("Item", "lead_time_days")
+		and cint(item.get("lead_time_days")) == cint(dlt_days)
+	):
+		values["lead_time_days"] = 0
+	if values:
+		frappe.db.set_value("Item", item_code, values)
 
 
 def validate_item_lead_time_lock(doc, method=None):
@@ -703,6 +815,7 @@ def _coerce_item_row(item) -> frappe._dict:
 		fields = ["name", "item_name", "stock_uom", "item_group"]
 		for fieldname in (
 			"is_stock_item",
+			"disabled",
 			"default_warehouse",
 			"custom_mrp_use_stock_buffer",
 			"custom_mrp_lead_time_days",
@@ -718,9 +831,23 @@ def _coerce_item_row(item) -> frappe._dict:
 
 
 def _item_is_stock_enabled(item) -> bool:
+	if _has_field("Item", "disabled") and cint(item.get("disabled")):
+		return False
 	if _has_field("Item", "is_stock_item"):
 		return bool(cint(item.get("is_stock_item")))
 	return True
+
+
+def _item_code_is_stock_enabled(item_code: str | None) -> bool:
+	if not item_code:
+		return False
+	if not _doctype_exists("Item"):
+		return True
+	cache = _runtime_cache()
+	cache_key = ("__item_stock_enabled__", item_code, "")
+	if cache_key not in cache:
+		cache[cache_key] = _item_is_stock_enabled(_coerce_item_row(item_code))
+	return bool(cache[cache_key])
 
 
 def _get_default_buffer_company() -> str | None:
@@ -752,16 +879,15 @@ def _get_item_default_warehouse_map(item_codes: list[str], company: str | None) 
 	filters = {"parent": ["in", item_codes], "default_warehouse": ["is", "set"]}
 	if company and _has_field("Item Default", "company"):
 		filters["company"] = company
-	rows = frappe.get_all(
+	result = {}
+	for rows in _iter_get_all(
 		"Item Default",
 		filters=filters,
 		fields=["parent", "default_warehouse"],
-		order_by="idx asc",
-		limit_page_length=10000,
-	)
-	result = {}
-	for row in rows:
-		result.setdefault(row.parent, row.default_warehouse)
+		order_by="parent asc, idx asc",
+	):
+		for row in rows:
+			result.setdefault(row.parent, row.default_warehouse)
 	return result
 
 
@@ -1007,8 +1133,7 @@ def _item_query_filters(filters: dict[str, Any]) -> dict[str, Any]:
 	return query_filters
 
 
-def _get_stock_buffer_console_items(filters: dict[str, Any]) -> list[frappe._dict]:
-	query_filters = _item_query_filters(filters)
+def _stock_buffer_console_item_fields() -> list[str]:
 	fields = ["name", "item_name", "item_group", "stock_uom"]
 	for fieldname in (
 		"is_stock_item",
@@ -1024,13 +1149,38 @@ def _get_stock_buffer_console_items(filters: dict[str, Any]) -> list[frappe._dic
 	):
 		if _has_field("Item", fieldname):
 			fields.append(fieldname)
-	return frappe.get_all(
+	return fields
+
+
+def _iter_stock_buffer_console_items(filters: dict[str, Any], page_length: int = BULK_PAGE_LENGTH):
+	query_filters = _item_query_filters(filters)
+	for rows in _iter_get_all(
 		"Item",
 		filters=query_filters,
-		fields=fields,
+		fields=_stock_buffer_console_item_fields(),
 		order_by="item_group asc, name asc",
-		limit_page_length=10000,
-	)
+		page_length=page_length,
+	):
+		yield rows
+
+
+def _iter_stock_buffer_console_rows(filters: dict[str, Any] | None = None, page_length: int = BULK_PAGE_LENGTH):
+	filters = filters or {}
+	company = filters.get("company") or _get_default_buffer_company()
+	status_filter = filters.get("status")
+	for items in _iter_stock_buffer_console_items(filters, page_length=page_length):
+		item_codes = [row.name for row in items]
+		item_default_warehouses = _get_item_default_warehouse_map(item_codes, company)
+		buffers_by_key, default_counts = _get_console_buffer_maps(company, item_codes)
+		for item in items:
+			warehouse = _get_item_buffer_warehouse(item, company, item_default_warehouses)
+			key = (item.name, warehouse or "")
+			buffers = buffers_by_key.get(key, [])
+			buffer = buffers[0] if buffers else frappe._dict()
+			status = _get_console_status(item, warehouse, buffers, default_counts.get(item.name, 0))
+			if status_filter and status != status_filter:
+				continue
+			yield _make_console_row(item, company, warehouse, buffer, status)
 
 
 def _get_console_buffer_maps(company: str | None, item_codes: list[str]):
@@ -1072,18 +1222,18 @@ def _get_console_buffer_maps(company: str | None, item_codes: list[str]):
 	):
 		if _has_field("MRP Stock Buffer", fieldname):
 			fields.append(fieldname)
-	rows = frappe.get_all(
+	by_key: dict[tuple[str, str], list[frappe._dict]] = {}
+	default_counts: dict[str, int] = {}
+	for rows in _iter_get_all(
 		"MRP Stock Buffer",
 		filters={"active": 1, "company": company, "item_code": ["in", item_codes]},
 		fields=fields,
-		limit_page_length=10000,
-	)
-	by_key: dict[tuple[str, str], list[frappe._dict]] = {}
-	default_counts: dict[str, int] = {}
-	for row in rows:
-		by_key.setdefault((row.item_code, row.warehouse or ""), []).append(row)
-		if cint(row.is_default_for_item):
-			default_counts[row.item_code] = default_counts.get(row.item_code, 0) + 1
+		order_by="item_code asc, warehouse asc, name asc",
+	):
+		for row in rows:
+			by_key.setdefault((row.item_code, row.warehouse or ""), []).append(row)
+			if cint(row.is_default_for_item):
+				default_counts[row.item_code] = default_counts.get(row.item_code, 0) + 1
 	return by_key, default_counts
 
 
@@ -1199,13 +1349,15 @@ def _get_item_group_with_descendants(item_group: str | None) -> list[str]:
 	bounds = frappe.db.get_value("Item Group", item_group, ["lft", "rgt"], as_dict=True)
 	if not bounds:
 		return [item_group]
-	rows = frappe.get_all(
+	groups = []
+	for rows in _iter_get_all(
 		"Item Group",
 		filters={"lft": [">=", bounds.lft], "rgt": ["<=", bounds.rgt]},
 		fields=["name"],
-		limit_page_length=10000,
-	)
-	return [row.name for row in rows] or [item_group]
+		order_by="lft asc",
+	):
+		groups.extend(row.name for row in rows)
+	return groups or [item_group]
 
 
 def _item_group_is_descendant_of(item_group: str | None, root_group: str) -> bool:

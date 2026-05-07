@@ -3488,6 +3488,14 @@ def _get_suggested_order_date(material_need_date, lead_time: int):
 	return add_days(material_need_date or today(), -cint(lead_time))
 
 
+def _get_material_request_schedule_date(*date_values):
+	for date_value in date_values:
+		if date_value:
+			schedule_date = getdate(date_value)
+			return max(schedule_date, getdate(today()))
+	return getdate(today())
+
+
 def _classify_supply_timing(supply_type, expected_arrival_date, material_need_date, settings) -> dict[str, Any]:
 	if not expected_arrival_date or not material_need_date:
 		return {"variance_days": 0}
@@ -3535,6 +3543,10 @@ def _get_supply_records(item_code: str, company: str, warehouse: str | None, set
 def _create_proposal_batch(run, settings, requirements: list[Any]):
 	rows = []
 	for line in requirements:
+		proposal_schedule_date = _get_material_request_schedule_date(
+			line.material_need_date,
+			line.required_date,
+		)
 		if flt(line.prebuy_consumed_qty) > 0:
 			rows.append(
 				{
@@ -3544,10 +3556,11 @@ def _create_proposal_batch(run, settings, requirements: list[Any]):
 					"warehouse": line.warehouse,
 					"from_warehouse": line.source_warehouse,
 					"required_date": line.required_date,
-					"schedule_date": line.suggested_order_date or line.required_date,
+					"schedule_date": proposal_schedule_date,
+					"suggested_order_date": line.suggested_order_date,
 					"qty": line.prebuy_consumed_qty,
 					"original_qty": line.prebuy_consumed_qty,
-					"original_schedule_date": line.suggested_order_date or line.required_date,
+					"original_schedule_date": proposal_schedule_date,
 					"uom": line.uom,
 					"material_request_type": line.material_request_type or settings.default_material_request_type,
 					"supply_mode": line.supply_mode,
@@ -3577,10 +3590,11 @@ def _create_proposal_batch(run, settings, requirements: list[Any]):
 					"warehouse": line.warehouse,
 					"from_warehouse": line.source_warehouse,
 					"required_date": line.required_date,
-					"schedule_date": line.suggested_order_date or line.required_date,
+					"schedule_date": proposal_schedule_date,
+					"suggested_order_date": line.suggested_order_date,
 					"qty": proposal_qty,
 					"original_qty": proposal_qty,
-					"original_schedule_date": line.suggested_order_date or line.required_date,
+					"original_schedule_date": proposal_schedule_date,
 					"uom": line.uom,
 					"material_request_type": line.material_request_type or _get_material_request_type(line.item_code, settings),
 					"supply_mode": line.supply_mode,
@@ -3782,7 +3796,14 @@ def _validate_proposal_row_for_release(row, mr_type):
 
 
 def _make_material_request(batch, rows, mr_type, commitment_type, warehouse, from_warehouse, customer, supplier, settings):
-	schedule_date = min([row.schedule_date or row.required_date for row in rows if row.schedule_date or row.required_date] or [today()])
+	schedule_date = min(
+		[
+			_get_material_request_schedule_date(row.schedule_date, row.required_date)
+			for row in rows
+			if row.schedule_date or row.required_date
+		]
+		or [getdate(today())]
+	)
 	doc = frappe.new_doc("Material Request")
 	doc.material_request_type = mr_type
 	doc.company = batch.company
@@ -3797,7 +3818,7 @@ def _make_material_request(batch, rows, mr_type, commitment_type, warehouse, fro
 		item_row = {
 			"item_code": row.item_code,
 			"qty": row.qty,
-			"schedule_date": row.schedule_date or row.required_date or schedule_date,
+			"schedule_date": _get_material_request_schedule_date(row.schedule_date, row.required_date, schedule_date),
 			"warehouse": row.warehouse or warehouse or settings.default_target_warehouse,
 			"from_warehouse": row.from_warehouse or from_warehouse,
 			"uom": row.uom,
