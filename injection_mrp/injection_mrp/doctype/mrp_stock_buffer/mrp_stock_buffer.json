@@ -21,6 +21,14 @@
   "minimum_order_cycle_days",
   "min_order_qty",
   "order_multiple_qty",
+  "suggestion_section",
+  "suggested_dlt_days",
+  "suggested_dlt_source",
+  "suggested_dlt_confidence",
+  "suggested_min_order_qty",
+  "suggested_order_multiple_qty",
+  "suggestions_calculated_on",
+  "suggestion_notes",
   "adu_section",
   "adu_calculation_method",
   "fixed_adu",
@@ -112,6 +120,7 @@
    "label": "Buffer Policy"
   },
   {
+   "description": "Select a reusable buffer policy. The profile can fill lead time, variability and order cycle factors.",
    "fieldname": "buffer_profile",
    "fieldtype": "Link",
    "label": "Buffer Profile",
@@ -119,6 +128,7 @@
   },
   {
    "default": "0",
+   "description": "Decoupled Lead Time in days. MRP uses this before supplier or item lead time; leave 0 only when you want MRP to fall back.",
    "fieldname": "dlt_days",
    "fieldtype": "Float",
    "in_list_view": 1,
@@ -126,6 +136,7 @@
   },
   {
    "default": "1",
+   "description": "Multiplier used in red and green zone calculations. Keep 1 for a normal lead-time buffer.",
    "fetch_from": "buffer_profile.lead_time_factor",
    "fieldname": "lead_time_factor",
    "fieldtype": "Float",
@@ -133,6 +144,7 @@
   },
   {
    "default": "0.5",
+   "description": "Safety factor for demand or supplier variability. Higher values increase the red safety zone.",
    "fetch_from": "buffer_profile.variability_factor",
    "fieldname": "variability_factor",
    "fieldtype": "Float",
@@ -140,6 +152,7 @@
   },
   {
    "default": "0",
+   "description": "Minimum days of demand to cover in the green zone. Use 0 when MOQ or DLT should drive replenishment.",
    "fetch_from": "buffer_profile.default_order_cycle_days",
    "fieldname": "minimum_order_cycle_days",
    "fieldtype": "Float",
@@ -147,15 +160,68 @@
   },
   {
    "default": "0",
+   "description": "Optional purchase or production minimum. Recommended Qty will be raised to at least this quantity.",
    "fieldname": "min_order_qty",
    "fieldtype": "Float",
    "label": "Minimum Order Qty"
   },
   {
    "default": "0",
+   "description": "Optional order multiple. Recommended Qty will be rounded up to this multiple.",
    "fieldname": "order_multiple_qty",
    "fieldtype": "Float",
    "label": "Order Multiple Qty"
+  },
+  {
+   "fieldname": "suggestion_section",
+   "fieldtype": "Section Break",
+   "label": "System Suggestions"
+  },
+  {
+   "description": "System-calculated DLT suggestion from supply rules, supplier quotations, item prices, item lead time, or recent purchase orders. Review before applying.",
+   "fieldname": "suggested_dlt_days",
+   "fieldtype": "Float",
+   "label": "Suggested DLT Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggested_dlt_source",
+   "fieldtype": "Data",
+   "label": "Suggested DLT Source",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggested_dlt_confidence",
+   "fieldtype": "Select",
+   "label": "Suggested DLT Confidence",
+   "options": "\nHigh\nMedium\nLow",
+   "read_only": 1
+  },
+  {
+   "description": "System-calculated MOQ suggestion from supply rules or Item master data. Review before applying.",
+   "fieldname": "suggested_min_order_qty",
+   "fieldtype": "Float",
+   "label": "Suggested Minimum Order Qty",
+   "read_only": 1
+  },
+  {
+   "description": "System-calculated order multiple suggestion from supply rules or Item Price packing unit. Review before applying.",
+   "fieldname": "suggested_order_multiple_qty",
+   "fieldtype": "Float",
+   "label": "Suggested Order Multiple Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggestions_calculated_on",
+   "fieldtype": "Datetime",
+   "label": "Suggestions Calculated On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggestion_notes",
+   "fieldtype": "Small Text",
+   "label": "Suggestion Notes",
+   "read_only": 1
   },
   {
    "fieldname": "adu_section",
@@ -164,6 +230,7 @@
   },
   {
    "default": "Fixed",
+   "description": "Choose how ADU is calculated. The form only shows fields needed by the selected method.",
    "fieldname": "adu_calculation_method",
    "fieldtype": "Select",
    "in_list_view": 1,
@@ -172,36 +239,52 @@
   },
   {
    "default": "0",
+   "depends_on": "eval:doc.adu_calculation_method=='Fixed'",
+   "description": "Only used when ADU Calculation Method is Fixed. Hidden for historical or MRP-based methods.",
    "fieldname": "fixed_adu",
    "fieldtype": "Float",
-   "label": "Fixed ADU"
+   "label": "Fixed ADU",
+   "mandatory_depends_on": "eval:doc.adu_calculation_method=='Fixed'"
   },
   {
    "default": "90",
+   "depends_on": "eval:doc.adu_calculation_method=='Past Actual' || doc.adu_calculation_method=='Blended'",
+   "description": "Number of past days used for historical ADU. It reads negative Stock Ledger Entries for this item and warehouse.",
    "fieldname": "horizon_past_days",
    "fieldtype": "Int",
-   "label": "Past Horizon Days"
+   "label": "Past Horizon Days",
+   "mandatory_depends_on": "eval:doc.adu_calculation_method=='Past Actual' || doc.adu_calculation_method=='Blended'"
   },
   {
    "default": "90",
+   "depends_on": "eval:doc.adu_calculation_method=='Future MRP' || doc.adu_calculation_method=='Blended'",
+   "description": "Number of future days used for MRP-based ADU. It reads demand from the current or latest completed MRP run.",
    "fieldname": "horizon_future_days",
    "fieldtype": "Int",
-   "label": "Future Horizon Days"
+   "label": "Future Horizon Days",
+   "mandatory_depends_on": "eval:doc.adu_calculation_method=='Future MRP' || doc.adu_calculation_method=='Blended'"
   },
   {
    "default": "0.5",
+   "depends_on": "eval:doc.adu_calculation_method=='Blended'",
+   "description": "Weight for historical ADU in Blended mode. The system normalizes past and future factors.",
    "fieldname": "factor_past",
    "fieldtype": "Float",
-   "label": "Past Factor"
+   "label": "Past Factor",
+   "mandatory_depends_on": "eval:doc.adu_calculation_method=='Blended'"
   },
   {
    "default": "0.5",
+   "depends_on": "eval:doc.adu_calculation_method=='Blended'",
+   "description": "Weight for future MRP ADU in Blended mode. The system normalizes past and future factors.",
    "fieldname": "factor_future",
    "fieldtype": "Float",
-   "label": "Future Factor"
+   "label": "Future Factor",
+   "mandatory_depends_on": "eval:doc.adu_calculation_method=='Blended'"
   },
   {
    "default": "0",
+   "description": "Calculated average daily usage. Save or click Refresh Buffer to recalculate.",
    "fieldname": "adu",
    "fieldtype": "Float",
    "in_list_view": 1,

@@ -1,11 +1,20 @@
 STANDARD_CUSTOM_FIELDS = {
 	"Item": [
 		{
+			"fieldname": "custom_mrp_use_stock_buffer",
+			"label": "Use MRP Stock Buffer",
+			"fieldtype": "Check",
+			"insert_after": "default_warehouse",
+			"default": "0",
+			"no_copy": 1,
+			"description": "Enable automatic MRP Stock Buffer creation and scheduled recalculation for this item.",
+		},
+		{
 			"fieldname": "custom_mrp_default_stock_buffer",
 			"label": "Default MRP Stock Buffer",
 			"fieldtype": "Link",
 			"options": "MRP Stock Buffer",
-			"insert_after": "lead_time_days",
+			"insert_after": "custom_mrp_use_stock_buffer",
 			"read_only": 1,
 			"no_copy": 1,
 			"description": "Owned by Injection MRP. Default buffer controls MRP lead time.",

@@ -12,6 +12,7 @@
   "from_warehouse",
   "required_date",
   "schedule_date",
+  "suggested_order_date",
   "qty",
   "uom",
   "material_request_type",
@@ -93,6 +94,12 @@
    "fieldname": "schedule_date",
    "fieldtype": "Date",
    "label": "Schedule Date"
+  },
+  {
+   "fieldname": "suggested_order_date",
+   "fieldtype": "Date",
+   "label": "Suggested Order Date",
+   "read_only": 1
   },
   {
    "fieldname": "qty",

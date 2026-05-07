@@ -17,6 +17,10 @@ frappe.provide("injection_mrp.ui");
 		apply_proposal_batch: ["System Manager", "MPLM", "MPLP"],
 		validate_proposal_batch_for_release: ["System Manager", "MPLM", "MPLP"],
 		save_proposal_batch_items: ["System Manager", "MPLM", "MPLP"],
+		create_missing_stock_buffers: ["System Manager", "MPLM", "MPLP"],
+		recalculate_stock_buffers: ["System Manager", "MPLM", "MPLP"],
+		apply_stock_buffer_item_group_defaults: ["System Manager", "MPLM", "MPLP"],
+		apply_stock_buffer_suggestions: ["System Manager", "MPLM", "MPLP"],
 	};
 
 	injection_mrp.ui.ensure_styles = function () {

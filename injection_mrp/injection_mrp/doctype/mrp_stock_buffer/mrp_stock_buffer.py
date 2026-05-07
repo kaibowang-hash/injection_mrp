@@ -31,21 +31,21 @@ class MRPStockBuffer(Document):
 			self.horizon_past_days = 90
 		if not cint(self.horizon_future_days):
 			self.horizon_future_days = 90
-			if self.adu_calculation_method == "Blended" and not flt(self.factor_past) and not flt(self.factor_future):
-				self.factor_past = 0.5
-				self.factor_future = 0.5
-			if flt(self.dlt_days) < 0:
-				frappe.throw(_("DLT Days cannot be negative."))
-			if flt(self.lead_time_factor) < 0 or flt(self.variability_factor) < 0:
-				frappe.throw(_("Lead Time Factor and Variability Factor cannot be negative."))
-			if flt(self.minimum_order_cycle_days) < 0:
-				frappe.throw(_("Minimum Order Cycle Days cannot be negative."))
-			if flt(self.fixed_adu) < 0:
-				frappe.throw(_("Fixed ADU cannot be negative."))
-			if flt(self.factor_past) < 0 or flt(self.factor_future) < 0:
-				frappe.throw(_("ADU blend factors cannot be negative."))
-			if flt(self.min_order_qty) < 0 or flt(self.order_multiple_qty) < 0:
-				frappe.throw(_("Minimum order quantity and order multiple cannot be negative."))
+		if self.adu_calculation_method == "Blended" and not flt(self.factor_past) and not flt(self.factor_future):
+			self.factor_past = 0.5
+			self.factor_future = 0.5
+		if flt(self.dlt_days) < 0:
+			frappe.throw(_("DLT Days cannot be negative."))
+		if flt(self.lead_time_factor) < 0 or flt(self.variability_factor) < 0:
+			frappe.throw(_("Lead Time Factor and Variability Factor cannot be negative."))
+		if flt(self.minimum_order_cycle_days) < 0:
+			frappe.throw(_("Minimum Order Cycle Days cannot be negative."))
+		if flt(self.fixed_adu) < 0:
+			frappe.throw(_("Fixed ADU cannot be negative."))
+		if flt(self.factor_past) < 0 or flt(self.factor_future) < 0:
+			frappe.throw(_("ADU blend factors cannot be negative."))
+		if flt(self.min_order_qty) < 0 or flt(self.order_multiple_qty) < 0:
+			frappe.throw(_("Minimum order quantity and order multiple cannot be negative."))
 		stock_buffer.validate_buffer_uniqueness(self)
 		if not self.flags.get("ignore_mrp_buffer_refresh"):
 			state = stock_buffer.calculate_buffer_state(self)

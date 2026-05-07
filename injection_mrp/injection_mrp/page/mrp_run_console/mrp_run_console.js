@@ -92,6 +92,7 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 			{ label: __("Current Net"), fieldname: "current_net_qty", formatter: ui.format_number },
 			{ label: __("Delta"), fieldname: "delta_net_qty", formatter: ui.format_number },
 		];
+		const bufferRows = data.buffer_rows || [];
 		ui.open_drawer(row.name, [
 			{
 				title: __("Run Comparison"),
@@ -102,10 +103,39 @@ frappe.pages["mrp-run-console"].on_page_load = function (wrapper) {
 				],
 			},
 			{
+				title: __("Stock Buffer"),
+				html: bufferRows.length
+					? `<div class="imrp-run-buffer-list">${bufferRows.map(render_buffer_drawer_item).join("")}</div>`
+					: `<div class="ia-muted">${__("No stock buffer data found.")}</div>`,
+			},
+			{
 				title: __("Requirement Changes"),
 				html: ui.mini_table_html(comparisonColumns, data.rows || [], __("No comparable requirements found.")),
 			},
 		]);
+	}
+
+	function render_buffer_drawer_item(buffer) {
+		return `
+			<div class="imrp-run-buffer-item">
+				<div class="imrp-run-buffer-head">
+					${ui.item_cell(buffer.item_code, buffer.item_name)}
+					<div class="imrp-run-buffer-tags">
+						${buffer.stock_buffer ? ui.doc_link("MRP Stock Buffer", buffer.stock_buffer) : ""}
+						${ui.code_badge(buffer.buffer_priority || buffer.planning_priority, { kind: "warning" })}
+					</div>
+				</div>
+				${ui.buffer_chart_html(buffer)}
+				<div class="imrp-run-buffer-meta">
+					<span>${__("Warehouse")}: <b>${ui.escape(buffer.warehouse || "-")}</b></span>
+					<span>${__("Requirement Count")}: <b>${ui.format_number(buffer.requirement_count, 0)}</b></span>
+					<span>${__("Current Net")}: <b>${ui.format_number(buffer.current_net_qty)}</b></span>
+					<span>${__("Planned", null, "Injection MRP")}: <b>${ui.format_number(buffer.current_new_supply_qty)}</b></span>
+					<span>${__("Buffer Lead Time Days")}: <b>${ui.format_number(buffer.buffer_lead_time_days, 0)}</b></span>
+					<span>${__("Suggested Order Date")}: <b>${ui.format_date(buffer.suggested_order_date)}</b></span>
+				</div>
+			</div>
+		`;
 	}
 
 	function open_run_dialog(method, title) {

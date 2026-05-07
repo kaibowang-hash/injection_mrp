@@ -1,7 +1,7 @@
 {
  "app": "injection_mrp",
  "charts": [],
- "content": "[{\"id\":\"header-injection-mrp\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Injection MRP</b></span>\",\"col\":12}},{\"id\":\"text-injection-mrp\",\"type\":\"paragraph\",\"data\":{\"text\":\"Forecast prebuy, firm APS material demand, BOM explosion, supply offsets, rolling shortage alerts, prebuy consumption and Material Request release for injection manufacturing.\",\"col\":12}},{\"id\":\"shortcut-demand-console\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Demand Console\",\"col\":2}},{\"id\":\"shortcut-material-workbench\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Material Workbench\",\"col\":2}},{\"id\":\"shortcut-pegging-detail\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Pegging Detail\",\"col\":2}},{\"id\":\"shortcut-shortage-timeline\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Shortage Timeline\",\"col\":2}},{\"id\":\"shortcut-run-console\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Run Console\",\"col\":2}},{\"id\":\"shortcut-release-center\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Release Center\",\"col\":2}},{\"id\":\"spacer-1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"card-console\",\"type\":\"card\",\"data\":{\"card_name\":\"MRP Console\",\"col\":4}},{\"id\":\"card-transactions\",\"type\":\"card\",\"data\":{\"card_name\":\"Transactions\",\"col\":4}},{\"id\":\"card-config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}}]",
+ "content": "[{\"id\":\"header-injection-mrp\",\"type\":\"header\",\"data\":{\"text\":\"<span class=\\\"h4\\\"><b>Injection MRP</b></span>\",\"col\":12}},{\"id\":\"text-injection-mrp\",\"type\":\"paragraph\",\"data\":{\"text\":\"Forecast prebuy, firm APS material demand, BOM explosion, supply offsets, rolling shortage alerts, prebuy consumption and Material Request release for injection manufacturing.\",\"col\":12}},{\"id\":\"shortcut-demand-console\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Demand Console\",\"col\":2}},{\"id\":\"shortcut-material-workbench\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Material Workbench\",\"col\":2}},{\"id\":\"shortcut-stock-buffer-console\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Stock Buffer Console\",\"col\":2}},{\"id\":\"shortcut-pegging-detail\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Pegging Detail\",\"col\":2}},{\"id\":\"shortcut-shortage-timeline\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Shortage Timeline\",\"col\":2}},{\"id\":\"shortcut-run-console\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Run Console\",\"col\":2}},{\"id\":\"shortcut-release-center\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"MRP Release Center\",\"col\":2}},{\"id\":\"spacer-1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"card-console\",\"type\":\"card\",\"data\":{\"card_name\":\"MRP Console\",\"col\":4}},{\"id\":\"card-transactions\",\"type\":\"card\",\"data\":{\"card_name\":\"Transactions\",\"col\":4}},{\"id\":\"card-config\",\"type\":\"card\",\"data\":{\"card_name\":\"Configuration\",\"col\":4}}]",
  "custom_blocks": [],
  "doctype": "Workspace",
  "for_user": "",
@@ -12,7 +12,7 @@
  "links": [
   {
    "label": "MRP Console",
-   "link_count": 6,
+   "link_count": 7,
    "link_type": "Page",
    "type": "Card Break"
   },
@@ -25,6 +25,12 @@
   {
    "label": "MRP Material Workbench",
    "link_to": "mrp-material-workbench",
+   "link_type": "Page",
+   "type": "Link"
+  },
+  {
+   "label": "MRP Stock Buffer Console",
+   "link_to": "mrp-stock-buffer-console",
    "link_type": "Page",
    "type": "Link"
   },
@@ -192,6 +198,12 @@
    "color": "Grey",
    "label": "MRP Material Workbench",
    "link_to": "mrp-material-workbench",
+   "type": "Page"
+  },
+  {
+   "color": "Grey",
+   "label": "MRP Stock Buffer Console",
+   "link_to": "mrp-stock-buffer-console",
    "type": "Page"
   },
   {
