@@ -4,7 +4,7 @@ import inspect
 
 import frappe
 from frappe import _
-from frappe.utils import now_datetime
+from frappe.utils import cint, now_datetime
 from frappe.utils.xlsxutils import make_xlsx
 
 from injection_mrp.services import planning
@@ -236,6 +236,17 @@ def apply_stock_buffer_item_group_defaults(filters=None, item_codes=None):
 	return stock_buffer.apply_stock_buffer_item_group_defaults(
 		_parse_json(filters),
 		_parse_json(item_codes) if isinstance(item_codes, str) else item_codes,
+	)
+
+
+@frappe.whitelist()
+def apply_stock_buffer_suggestions(filters=None, item_codes=None, apply_dlt=1, apply_order_constraints=1):
+	_require_any_role(PLAN_ROLES)
+	return stock_buffer.apply_stock_buffer_suggestions(
+		_parse_json(filters),
+		_parse_json(item_codes) if isinstance(item_codes, str) else item_codes,
+		apply_dlt=bool(cint(apply_dlt)),
+		apply_order_constraints=bool(cint(apply_order_constraints)),
 	)
 
 

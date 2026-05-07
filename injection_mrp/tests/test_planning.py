@@ -412,6 +412,15 @@ class TestPlanningHelpers(unittest.TestCase):
 				stock_buffer._get_console_status(
 					item,
 					"Stores",
+					[frappe._dict({"dlt_days": 0, "suggested_dlt_days": 12})],
+					0,
+				),
+				"Review DLT",
+			)
+			self.assertEqual(
+				stock_buffer._get_console_status(
+					item,
+					"Stores",
 					[frappe._dict({"dlt_days": 10, "is_default_for_item": 0})],
 					1,
 				),
@@ -426,6 +435,41 @@ class TestPlanningHelpers(unittest.TestCase):
 					0,
 				),
 				"Needs Refresh",
+			)
+			self.assertEqual(
+				stock_buffer._get_console_status(
+					item,
+					"Stores",
+					[
+						frappe._dict(
+							{
+								"dlt_days": 10,
+								"suggested_dlt_days": 14,
+								"last_calculated_on": datetime(2026, 5, 2, 11, 0, 0),
+							}
+						)
+					],
+					0,
+				),
+				"DLT Mismatch",
+			)
+			self.assertEqual(
+				stock_buffer._get_console_status(
+					item,
+					"Stores",
+					[
+						frappe._dict(
+							{
+								"dlt_days": 10,
+								"min_order_qty": 0,
+								"suggested_min_order_qty": 500,
+								"last_calculated_on": datetime(2026, 5, 2, 11, 0, 0),
+							}
+						)
+					],
+					0,
+				),
+				"Procurement Mismatch",
 			)
 			self.assertEqual(
 				stock_buffer._get_console_status(
@@ -501,6 +545,119 @@ class TestPlanningHelpers(unittest.TestCase):
 		self.assertIsNone(warehouse)
 		self.assertEqual(calls[0]["company"], "Test Company")
 		self.assertEqual(len(calls), 1)
+
+	def test_stock_buffer_procurement_suggestions_do_not_override_current_fields(self):
+		original_coerce = stock_buffer._coerce_item_row
+		original_default_supplier = stock_buffer._get_item_default_supplier
+		original_item_supplier = stock_buffer._get_item_supplier
+		original_rule = stock_buffer._get_supply_rule_suggestion
+		original_quotation = stock_buffer._get_supplier_quotation_suggestion
+		original_item_price = stock_buffer._get_item_price_suggestion
+		original_po_history = stock_buffer._get_purchase_order_history_suggestion
+		original_today = stock_buffer.today
+		original_now = stock_buffer.now_datetime
+		original_translate = stock_buffer._
+		try:
+			stock_buffer._ = lambda value: value
+			stock_buffer.today = lambda: "2026-05-07"
+			stock_buffer.now_datetime = lambda: datetime(2026, 5, 7, 10, 0, 0)
+			stock_buffer._coerce_item_row = lambda item_code: frappe._dict(
+				{"name": item_code, "item_group": "Raw-material", "min_order_qty": 300}
+			)
+			stock_buffer._get_item_default_supplier = lambda item_code, company=None: "SUP-001"
+			stock_buffer._get_item_supplier = lambda item_code: None
+			stock_buffer._get_supply_rule_suggestion = lambda item, company, warehouse: frappe._dict(
+				{
+					"name": "MRP-SR-001",
+					"item_code": item.name,
+					"supplier": "SUP-001",
+					"supplier_lead_time_days": 0,
+					"min_order_qty": 500,
+					"order_multiple_qty": 25,
+				}
+			)
+			stock_buffer._get_supplier_quotation_suggestion = lambda item_code, supplier=None, as_of_date=None: frappe._dict(
+				{"parent": "SQ-001", "supplier": "SUP-001", "lead_time_days": 14}
+			)
+			stock_buffer._get_item_price_suggestion = lambda item_code, supplier=None, as_of_date=None: frappe._dict(
+				{"name": "IP-001", "supplier": "SUP-001", "lead_time_days": 7, "packing_unit": 50}
+			)
+			stock_buffer._get_purchase_order_history_suggestion = lambda item_code, supplier=None: frappe._dict(
+				{"lead_time_days": 21, "sample_size": 8}
+			)
+
+			suggestion = stock_buffer.calculate_procurement_suggestions(
+				frappe._dict({"item_code": "RM-001", "company": "Test Company", "warehouse": "Stores", "dlt_days": 10})
+			)
+		finally:
+			stock_buffer._coerce_item_row = original_coerce
+			stock_buffer._get_item_default_supplier = original_default_supplier
+			stock_buffer._get_item_supplier = original_item_supplier
+			stock_buffer._get_supply_rule_suggestion = original_rule
+			stock_buffer._get_supplier_quotation_suggestion = original_quotation
+			stock_buffer._get_item_price_suggestion = original_item_price
+			stock_buffer._get_purchase_order_history_suggestion = original_po_history
+			stock_buffer.today = original_today
+			stock_buffer.now_datetime = original_now
+			stock_buffer._ = original_translate
+
+		self.assertEqual(suggestion.suggested_dlt_days, 14)
+		self.assertIn("Supplier Quotation", suggestion.suggested_dlt_source)
+		self.assertEqual(suggestion.suggested_dlt_confidence, "High")
+		self.assertEqual(suggestion.suggested_min_order_qty, 500)
+		self.assertEqual(suggestion.suggested_order_multiple_qty, 25)
+
+	def test_non_persistent_buffer_refresh_skips_procurement_suggestions(self):
+		original_on_hand = stock_buffer._get_on_hand_qty
+		original_incoming = stock_buffer._get_incoming_dlt_qty
+		original_demand = stock_buffer._get_qualified_demand_qty
+		original_supports = stock_buffer._buffer_supports_suggestions
+		original_suggestions = stock_buffer.calculate_procurement_suggestions
+		original_today = stock_buffer.today
+		original_now = stock_buffer.now_datetime
+		original_translate = stock_buffer._
+		calls = []
+		try:
+			stock_buffer._ = lambda value: value
+			stock_buffer.today = lambda: "2026-05-07"
+			stock_buffer.now_datetime = lambda: datetime(2026, 5, 7, 10, 0, 0)
+			stock_buffer._get_on_hand_qty = lambda item_code, company, warehouse: 0
+			stock_buffer._get_incoming_dlt_qty = lambda item_code, company, warehouse, cutoff_date: 0
+			stock_buffer._get_qualified_demand_qty = lambda item_code, company, warehouse, start_date, end_date: 0
+			stock_buffer._buffer_supports_suggestions = lambda: True
+			stock_buffer.calculate_procurement_suggestions = lambda doc: calls.append(doc.item_code) or frappe._dict(
+				{"suggested_dlt_days": 14}
+			)
+			buffer = frappe._dict(
+				{
+					"name": "MRP-BUF-001",
+					"company": "Test Company",
+					"item_code": "RM-001",
+					"warehouse": "Stores",
+					"dlt_days": 10,
+					"lead_time_factor": 1,
+					"variability_factor": 0,
+					"minimum_order_cycle_days": 0,
+					"fixed_adu": 2,
+					"adu_calculation_method": "Fixed",
+				}
+			)
+
+			transient_state = stock_buffer.refresh_buffer(buffer, persist=False)
+			persistent_state = stock_buffer.refresh_buffer(buffer, persist=True)
+		finally:
+			stock_buffer._get_on_hand_qty = original_on_hand
+			stock_buffer._get_incoming_dlt_qty = original_incoming
+			stock_buffer._get_qualified_demand_qty = original_demand
+			stock_buffer._buffer_supports_suggestions = original_supports
+			stock_buffer.calculate_procurement_suggestions = original_suggestions
+			stock_buffer.today = original_today
+			stock_buffer.now_datetime = original_now
+			stock_buffer._ = original_translate
+
+		self.assertNotIn("suggested_dlt_days", transient_state)
+		self.assertEqual(persistent_state.suggested_dlt_days, 14)
+		self.assertEqual(calls, ["RM-001"])
 
 	def test_order_qty_rounding_only_applies_to_purchase(self):
 		candidate = planning.RequirementCandidate(

@@ -16,6 +16,10 @@ frappe.pages["mrp-stock-buffer-console"].on_page_load = function (wrapper) {
 		"Missing Warehouse": "red",
 		"Missing DLT": "red",
 		"Needs Refresh": "orange",
+		"Review DLT": "orange",
+		"DLT Mismatch": "orange",
+		"Procurement Mismatch": "orange",
+		"Low Confidence": "orange",
 		Conflict: "red",
 	};
 	const columns = [
@@ -36,6 +40,9 @@ frappe.pages["mrp-stock-buffer-console"].on_page_load = function (wrapper) {
 		{ label: __("NFP %"), fieldname: "buffer_nfp_percent", numeric: true, formatter: ui.format_number },
 		{ label: __("Recommended Qty"), fieldname: "buffer_recommended_qty", numeric: true, formatter: ui.format_number },
 		{ label: __("DLT Days"), fieldname: "dlt_days", numeric: true, formatter: (value) => ui.format_number(value, 0) },
+		{ label: __("Suggested DLT Days"), fieldname: "suggested_dlt_days", numeric: true, formatter: (value) => (Number(value || 0) ? ui.format_number(value, 0) : "") },
+		{ label: __("Suggested DLT Source"), fieldname: "suggested_dlt_source" },
+		{ label: __("Suggested DLT Confidence"), fieldname: "suggested_dlt_confidence", formatter: (value) => ui.code_badge(value) },
 		{ label: __("Last Calculated On"), fieldname: "last_calculated_on", formatter: (value) => (value ? frappe.datetime.str_to_user(value) : "") },
 	];
 
@@ -78,6 +85,20 @@ frappe.pages["mrp-stock-buffer-console"].on_page_load = function (wrapper) {
 					{ label: __("DLT Days"), value: ui.format_number(row.dlt_days, 0) },
 					{ label: __("ADU"), value: ui.format_number(row.adu) },
 					{ label: __("Last Calculated On"), value: row.last_calculated_on ? frappe.datetime.str_to_user(row.last_calculated_on) : "" },
+				],
+			},
+			{
+				title: __("System Suggestions"),
+				rows: [
+					{ label: __("Suggested DLT Days"), value: row.suggested_dlt_days ? ui.format_number(row.suggested_dlt_days, 0) : "" },
+					{ label: __("Suggested DLT Source"), value: row.suggested_dlt_source || "" },
+					{ label: __("Suggested DLT Confidence"), html: ui.code_badge(row.suggested_dlt_confidence) },
+					{ label: __("Minimum Order Qty"), value: ui.format_number(row.min_order_qty) },
+					{ label: __("Suggested Minimum Order Qty"), value: row.suggested_min_order_qty ? ui.format_number(row.suggested_min_order_qty) : "" },
+					{ label: __("Order Multiple Qty"), value: ui.format_number(row.order_multiple_qty) },
+					{ label: __("Suggested Order Multiple Qty"), value: row.suggested_order_multiple_qty ? ui.format_number(row.suggested_order_multiple_qty) : "" },
+					{ label: __("Suggestions Calculated On"), value: row.suggestions_calculated_on ? frappe.datetime.str_to_user(row.suggestions_calculated_on) : "" },
+					{ label: __("Suggestion Notes"), value: row.suggestion_notes || "" },
 				],
 			},
 			{
@@ -147,11 +168,20 @@ frappe.pages["mrp-stock-buffer-console"].on_page_load = function (wrapper) {
 					item_codes: selected_item_codes(),
 				}),
 		},
+		{
+			label: __("Apply Suggestions"),
+			action_key: "apply_stock_buffer_suggestions",
+			on_click: () =>
+				run_action("injection_mrp.api.app.apply_stock_buffer_suggestions", __("Applying stock buffer suggestions..."), {
+					filters,
+					item_codes: selected_item_codes(),
+				}),
+		},
 	]);
 
 	ui.add_text_filter(shell.filters, __("Company"), "company", filters, load, "Link", "Company");
 	ui.add_text_filter(shell.filters, __("Item"), "item_code", filters, load, "Link", "Item");
 	ui.add_text_filter(shell.filters, __("Item Group"), "item_group", filters, load, "Link", "Item Group");
-	ui.add_text_filter(shell.filters, __("Status"), "status", filters, load, "Select", "\nActive\nMissing Buffer\nMissing Warehouse\nMissing DLT\nNeeds Refresh\nDisabled\nConflict");
+	ui.add_text_filter(shell.filters, __("Status"), "status", filters, load, "Select", "\nActive\nMissing Buffer\nMissing Warehouse\nMissing DLT\nNeeds Refresh\nReview DLT\nDLT Mismatch\nProcurement Mismatch\nLow Confidence\nDisabled\nConflict");
 	load();
 };

@@ -21,6 +21,14 @@
   "minimum_order_cycle_days",
   "min_order_qty",
   "order_multiple_qty",
+  "suggestion_section",
+  "suggested_dlt_days",
+  "suggested_dlt_source",
+  "suggested_dlt_confidence",
+  "suggested_min_order_qty",
+  "suggested_order_multiple_qty",
+  "suggestions_calculated_on",
+  "suggestion_notes",
   "adu_section",
   "adu_calculation_method",
   "fixed_adu",
@@ -163,6 +171,57 @@
    "fieldname": "order_multiple_qty",
    "fieldtype": "Float",
    "label": "Order Multiple Qty"
+  },
+  {
+   "fieldname": "suggestion_section",
+   "fieldtype": "Section Break",
+   "label": "System Suggestions"
+  },
+  {
+   "description": "System-calculated DLT suggestion from supply rules, supplier quotations, item prices, item lead time, or recent purchase orders. Review before applying.",
+   "fieldname": "suggested_dlt_days",
+   "fieldtype": "Float",
+   "label": "Suggested DLT Days",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggested_dlt_source",
+   "fieldtype": "Data",
+   "label": "Suggested DLT Source",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggested_dlt_confidence",
+   "fieldtype": "Select",
+   "label": "Suggested DLT Confidence",
+   "options": "\nHigh\nMedium\nLow",
+   "read_only": 1
+  },
+  {
+   "description": "System-calculated MOQ suggestion from supply rules or Item master data. Review before applying.",
+   "fieldname": "suggested_min_order_qty",
+   "fieldtype": "Float",
+   "label": "Suggested Minimum Order Qty",
+   "read_only": 1
+  },
+  {
+   "description": "System-calculated order multiple suggestion from supply rules or Item Price packing unit. Review before applying.",
+   "fieldname": "suggested_order_multiple_qty",
+   "fieldtype": "Float",
+   "label": "Suggested Order Multiple Qty",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggestions_calculated_on",
+   "fieldtype": "Datetime",
+   "label": "Suggestions Calculated On",
+   "read_only": 1
+  },
+  {
+   "fieldname": "suggestion_notes",
+   "fieldtype": "Small Text",
+   "label": "Suggestion Notes",
+   "read_only": 1
   },
   {
    "fieldname": "adu_section",

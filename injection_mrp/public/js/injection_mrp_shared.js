@@ -20,6 +20,7 @@ frappe.provide("injection_mrp.ui");
 		create_missing_stock_buffers: ["System Manager", "MPLM", "MPLP"],
 		recalculate_stock_buffers: ["System Manager", "MPLM", "MPLP"],
 		apply_stock_buffer_item_group_defaults: ["System Manager", "MPLM", "MPLP"],
+		apply_stock_buffer_suggestions: ["System Manager", "MPLM", "MPLP"],
 	};
 
 	injection_mrp.ui.ensure_styles = function () {

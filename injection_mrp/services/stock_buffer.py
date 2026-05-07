@@ -16,6 +16,9 @@ DEFAULT_ADU_METHOD = "Past Actual"
 DEFAULT_ADU_PAST_DAYS = 90
 BUFFER_ITEM_GROUP_ROOTS = ("Raw-material", "Packaging")
 BUFFER_REFRESH_STALE_HOURS = 24
+SUGGESTION_HIGH = "High"
+SUGGESTION_MEDIUM = "Medium"
+SUGGESTION_LOW = "Low"
 
 OPEN_DOC_STATUSES = ("Closed", "Stopped", "Cancelled")
 _FALLBACK_RUNTIME_CACHE: dict[tuple[str, str, str], frappe._dict] = {}
@@ -236,6 +239,55 @@ def create_missing_stock_buffers(filters: dict[str, Any] | None = None, item_cod
 	return {"created": len(created), "skipped": len(skipped), "failed": len(errors), "rows": created, "errors": errors}
 
 
+def apply_stock_buffer_suggestions(
+	filters: dict[str, Any] | None = None,
+	item_codes: list[str] | None = None,
+	apply_dlt: bool = True,
+	apply_order_constraints: bool = True,
+	ignore_permissions: bool = False,
+) -> dict[str, Any]:
+	if not _doctype_exists("MRP Stock Buffer"):
+		return {"updated": 0, "skipped": 0, "failed": 0, "rows": [], "errors": []}
+	filters = filters or {}
+	data = get_stock_buffer_console_data(filters, limit_start=0, limit_page_length=10000)
+	item_set = set(item_codes or [])
+	updated = []
+	skipped = []
+	errors = []
+	for row in data.get("rows", []):
+		if item_set and row.item_code not in item_set:
+			continue
+		if not row.get("stock_buffer"):
+			skipped.append({"item_code": row.item_code, "status": row.status})
+			continue
+		try:
+			doc = frappe.get_doc("MRP Stock Buffer", row.stock_buffer)
+			if not ignore_permissions:
+				doc.check_permission("write")
+			suggestion = calculate_procurement_suggestions(doc)
+			changed = []
+			if apply_dlt and _has_meaningful_suggestion_diff(doc.get("dlt_days"), suggestion.get("suggested_dlt_days")):
+				doc.dlt_days = flt(suggestion.suggested_dlt_days)
+				changed.append("dlt_days")
+			if apply_order_constraints:
+				if _has_meaningful_suggestion_diff(doc.get("min_order_qty"), suggestion.get("suggested_min_order_qty")):
+					doc.min_order_qty = flt(suggestion.suggested_min_order_qty)
+					changed.append("min_order_qty")
+				if _has_meaningful_suggestion_diff(doc.get("order_multiple_qty"), suggestion.get("suggested_order_multiple_qty")):
+					doc.order_multiple_qty = flt(suggestion.suggested_order_multiple_qty)
+					changed.append("order_multiple_qty")
+			if changed:
+				state = refresh_buffer(doc, persist=True, ignore_permissions=ignore_permissions)
+				updated.append({"stock_buffer": doc.name, "item_code": row.item_code, "fields": changed, "state": state})
+			else:
+				refresh_buffer(doc, persist=True, ignore_permissions=ignore_permissions)
+				skipped.append({"stock_buffer": doc.name, "item_code": row.item_code, "status": "No Suggestion Change"})
+		except Exception as exc:
+			errors.append({"stock_buffer": row.get("stock_buffer"), "item_code": row.item_code, "message": str(exc)})
+			frappe.log_error(frappe.get_traceback(), _("MRP Stock Buffer apply suggestions failed"))
+	return {"updated": len(updated), "skipped": len(skipped), "failed": len(errors), "rows": updated, "errors": errors}
+
+
 def apply_stock_buffer_item_group_defaults(
 	filters: dict[str, Any] | None = None,
 	item_codes: list[str] | None = None,
@@ -364,17 +416,25 @@ def get_buffer_name_for_item(item_code: str, company: str | None, warehouse: str
 	)
 
 
-def refresh_buffer(buffer, run=None, persist: bool = True, ignore_permissions: bool = False) -> frappe._dict:
+def refresh_buffer(
+	buffer,
+	run=None,
+	persist: bool = True,
+	ignore_permissions: bool = False,
+	include_suggestions: bool | None = None,
+) -> frappe._dict:
 	doc = frappe.get_doc("MRP Stock Buffer", buffer) if isinstance(buffer, str) else buffer
-	state = calculate_buffer_state(doc, run=run)
+	if include_suggestions is None:
+		include_suggestions = persist
+	state = calculate_buffer_state(doc, run=run, include_suggestions=include_suggestions)
 	for key, value in state.items():
 		if key in {"name", "company", "item_code", "item_name", "stock_uom", "warehouse"}:
 			continue
-		if hasattr(doc, "set"):
+		if callable(getattr(doc, "set", None)):
 			doc.set(key, value)
 		else:
 			doc[key] = value
-	if persist and hasattr(doc, "save"):
+	if persist and callable(getattr(doc, "save", None)):
 		doc.flags.ignore_mrp_buffer_refresh = True
 		doc.save(ignore_permissions=ignore_permissions)
 	cache_key = _state_cache_key(state.name, run)
@@ -382,8 +442,8 @@ def refresh_buffer(buffer, run=None, persist: bool = True, ignore_permissions: b
 	return state
 
 
-def calculate_buffer_state(buffer, run=None) -> frappe._dict:
-	doc = frappe._dict(buffer.as_dict() if hasattr(buffer, "as_dict") else dict(buffer))
+def calculate_buffer_state(buffer, run=None, include_suggestions: bool = True) -> frappe._dict:
+	doc = frappe._dict(buffer.as_dict() if callable(getattr(buffer, "as_dict", None)) else dict(buffer))
 	profile = _get_profile_values(doc.get("buffer_profile"))
 	lead_time_factor = flt(doc.get("lead_time_factor")) or flt(profile.get("lead_time_factor")) or 1
 	variability_factor = flt(doc.get("variability_factor")) or flt(profile.get("variability_factor"))
@@ -445,6 +505,8 @@ def calculate_buffer_state(buffer, run=None) -> frappe._dict:
 		}
 	)
 	state.update(zones)
+	if include_suggestions and _buffer_supports_suggestions():
+		state.update(calculate_procurement_suggestions(doc))
 	return state
 
 
@@ -468,6 +530,91 @@ def calculate_adu(buffer, run=None) -> float:
 			return 0
 		return (past * past_factor + future * future_factor) / total
 	return flt(buffer.get("fixed_adu"))
+
+
+def calculate_procurement_suggestions(buffer) -> frappe._dict:
+	doc = frappe._dict(buffer.as_dict() if callable(getattr(buffer, "as_dict", None)) else dict(buffer or {}))
+	item_code = doc.get("item_code")
+	company = doc.get("company")
+	warehouse = doc.get("warehouse")
+	item = _coerce_item_row(item_code) if item_code else frappe._dict()
+	as_of_date = getdate(today())
+	suggestion = frappe._dict(
+		{
+			"suggested_dlt_days": 0,
+			"suggested_dlt_source": None,
+			"suggested_dlt_confidence": None,
+			"suggested_min_order_qty": 0,
+			"suggested_order_multiple_qty": 0,
+			"suggestions_calculated_on": now_datetime(),
+			"suggestion_notes": None,
+		}
+	)
+	notes = []
+	supplier = _get_item_default_supplier(item_code, company) or _get_item_supplier(item_code)
+	rule = _get_supply_rule_suggestion(item, company, warehouse)
+	if rule:
+		if rule.get("supplier"):
+			supplier = rule.supplier
+		if flt(rule.get("min_order_qty")) > 0:
+			suggestion.suggested_min_order_qty = flt(rule.min_order_qty)
+		if flt(rule.get("order_multiple_qty")) > 0:
+			suggestion.suggested_order_multiple_qty = flt(rule.order_multiple_qty)
+		_set_dlt_suggestion(
+			suggestion,
+			rule.get("supplier_lead_time_days"),
+			_("MRP Supply Rule {0}").format(rule.name),
+			SUGGESTION_HIGH if rule.get("item_code") else SUGGESTION_MEDIUM,
+		)
+
+	quotation = _get_supplier_quotation_suggestion(item_code, supplier, as_of_date)
+	if not quotation and not supplier:
+		quotation = _get_supplier_quotation_suggestion(item_code, None, as_of_date)
+	if quotation:
+		if quotation.get("supplier"):
+			supplier = quotation.supplier
+		_set_dlt_suggestion(
+			suggestion,
+			quotation.get("lead_time_days"),
+			_("Supplier Quotation {0}").format(quotation.parent),
+			SUGGESTION_HIGH if supplier and quotation.get("supplier") == supplier else SUGGESTION_MEDIUM,
+		)
+
+	item_price = _get_item_price_suggestion(item_code, supplier, as_of_date)
+	if not item_price and not supplier:
+		item_price = _get_item_price_suggestion(item_code, None, as_of_date)
+	if item_price:
+		_set_dlt_suggestion(
+			suggestion,
+			item_price.get("lead_time_days"),
+			_("Item Price {0}").format(item_price.name),
+			SUGGESTION_MEDIUM if item_price.get("supplier") else SUGGESTION_LOW,
+		)
+		if not flt(suggestion.suggested_order_multiple_qty) and flt(item_price.get("packing_unit")) > 0:
+			suggestion.suggested_order_multiple_qty = flt(item_price.packing_unit)
+
+	if not flt(suggestion.suggested_min_order_qty) and flt(item.get("min_order_qty")) > 0:
+		suggestion.suggested_min_order_qty = flt(item.min_order_qty)
+	if not flt(suggestion.suggested_dlt_days):
+		item_lead_time = _get_item_lead_time_days(item)
+		_set_dlt_suggestion(suggestion, item_lead_time, _("Item Lead Time"), SUGGESTION_MEDIUM)
+	if not flt(suggestion.suggested_dlt_days):
+		po_history = _get_purchase_order_history_suggestion(item_code, supplier)
+		if po_history:
+			sample_size = cint(po_history.get("sample_size"))
+			_set_dlt_suggestion(
+				suggestion,
+				po_history.get("lead_time_days"),
+				_("Purchase Order History"),
+				SUGGESTION_MEDIUM if sample_size >= 5 else SUGGESTION_LOW,
+			)
+			notes.append(_("PO history sample size: {0}").format(sample_size))
+	if not flt(suggestion.suggested_dlt_days):
+		suggestion.suggested_dlt_confidence = SUGGESTION_LOW
+		notes.append(_("No maintained lead time source found."))
+	if notes:
+		suggestion.suggestion_notes = "; ".join(notes)
+	return suggestion
 
 
 def sync_default_buffer_to_item(buffer) -> None:
@@ -550,7 +697,7 @@ def get_chart_data(buffer_name: str | None = None, item_code: str | None = None,
 
 
 def _coerce_item_row(item) -> frappe._dict:
-	if hasattr(item, "as_dict"):
+	if callable(getattr(item, "as_dict", None)):
 		return frappe._dict(item.as_dict())
 	if isinstance(item, str):
 		fields = ["name", "item_name", "stock_uom", "item_group"]
@@ -561,6 +708,8 @@ def _coerce_item_row(item) -> frappe._dict:
 			"custom_mrp_lead_time_days",
 			"lead_time_days",
 			"lead_time",
+			"min_order_qty",
+			"purchase_uom",
 		):
 			if _has_field("Item", fieldname):
 				fields.append(fieldname)
@@ -631,6 +780,203 @@ def _get_item_lead_time_days(item) -> int:
 	return 0
 
 
+def _buffer_supports_suggestions() -> bool:
+	return _has_field("MRP Stock Buffer", "suggested_dlt_days")
+
+
+def _has_meaningful_suggestion_diff(current, suggested) -> bool:
+	return flt(suggested) > 0 and abs(flt(current) - flt(suggested)) > 0.000001
+
+
+def _set_dlt_suggestion(suggestion, value, source: str | None, confidence: str | None) -> None:
+	if flt(suggestion.get("suggested_dlt_days")) or flt(value) <= 0:
+		return
+	suggestion.suggested_dlt_days = flt(value)
+	suggestion.suggested_dlt_source = source
+	suggestion.suggested_dlt_confidence = confidence or SUGGESTION_LOW
+
+
+def _get_item_default_supplier(item_code: str | None, company: str | None = None) -> str | None:
+	if not item_code or not _doctype_exists("Item Default"):
+		return None
+	filters = {"parent": item_code, "default_supplier": ["is", "set"]}
+	if company and _has_field("Item Default", "company"):
+		filters["company"] = company
+	supplier = frappe.db.get_value("Item Default", filters, "default_supplier", order_by="idx asc")
+	if supplier or not company or not _has_field("Item Default", "company"):
+		return supplier
+	return frappe.db.get_value(
+		"Item Default",
+		{"parent": item_code, "default_supplier": ["is", "set"]},
+		"default_supplier",
+		order_by="idx asc",
+	)
+
+
+def _get_item_supplier(item_code: str | None) -> str | None:
+	if not item_code or not _doctype_exists("Item Supplier"):
+		return None
+	return frappe.db.get_value("Item Supplier", {"parent": item_code}, "supplier", order_by="idx asc")
+
+
+def _get_supply_rule_suggestion(item, company: str | None, warehouse: str | None):
+	if not _doctype_exists("MRP Supply Rule"):
+		return None
+	item_code = item.get("name") or item.get("item_code")
+	params = {
+		"company": company or "",
+		"item_code": item_code or "",
+		"item_group": item.get("item_group") or "",
+		"warehouse": warehouse or "",
+	}
+	rows = frappe.db.sql(
+		"""
+		select
+			name,
+			company,
+			item_code,
+			item_group,
+			warehouse,
+			supplier,
+			min_order_qty,
+			order_multiple_qty,
+			supplier_lead_time_days,
+			priority
+		from `tabMRP Supply Rule`
+		where enabled = 1
+			and (ifnull(company, '') = '' or company = %(company)s)
+			and (ifnull(item_code, '') = '' or item_code = %(item_code)s)
+			and (ifnull(item_group, '') = '' or item_group = %(item_group)s)
+			and (ifnull(warehouse, '') = '' or warehouse = %(warehouse)s)
+		order by
+			ifnull(priority, 0) desc,
+			case when ifnull(item_code, '') = %(item_code)s and %(item_code)s != '' then 0 else 1 end,
+			case when ifnull(item_group, '') = %(item_group)s and %(item_group)s != '' then 0 else 1 end,
+			case when ifnull(warehouse, '') = %(warehouse)s and %(warehouse)s != '' then 0 else 1 end,
+			modified desc
+		limit 1
+		""",
+		params,
+		as_dict=True,
+	)
+	return rows[0] if rows else None
+
+
+def _get_supplier_quotation_suggestion(item_code: str | None, supplier: str | None = None, as_of_date=None):
+	if not item_code or not _doctype_exists("Supplier Quotation") or not _doctype_exists("Supplier Quotation Item"):
+		return None
+	params = {"item_code": item_code, "as_of_date": getdate(as_of_date or today())}
+	supplier_clause = ""
+	if supplier:
+		supplier_clause = " and sq.supplier = %(supplier)s"
+		params["supplier"] = supplier
+	lead_time_expr = "sqi.lead_time_days" if _has_field("Supplier Quotation Item", "lead_time_days") else "0"
+	rows = frappe.db.sql(
+		f"""
+		select
+			sqi.name,
+			sqi.parent,
+			sq.supplier,
+			{lead_time_expr} as lead_time_days,
+			sq.transaction_date,
+			sq.valid_till
+		from `tabSupplier Quotation Item` sqi
+		inner join `tabSupplier Quotation` sq on sq.name = sqi.parent
+		where sqi.item_code = %(item_code)s
+			and sq.docstatus = 1
+			and (sq.valid_till is null or sq.valid_till >= %(as_of_date)s)
+			{supplier_clause}
+		order by
+			case when ifnull({lead_time_expr}, 0) > 0 then 0 else 1 end,
+			sq.transaction_date desc,
+			sqi.creation desc
+		limit 1
+		""",
+		params,
+		as_dict=True,
+	)
+	return rows[0] if rows else None
+
+
+def _get_item_price_suggestion(item_code: str | None, supplier: str | None = None, as_of_date=None):
+	if not item_code or not _doctype_exists("Item Price"):
+		return None
+	params = {"item_code": item_code, "as_of_date": getdate(as_of_date or today())}
+	supplier_expr = "ip.supplier" if _has_field("Item Price", "supplier") else "null"
+	supplier_order_expr = "case when ifnull(ip.supplier, '') != '' then 0 else 1 end" if _has_field("Item Price", "supplier") else "1"
+	packing_unit_expr = "ip.packing_unit" if _has_field("Item Price", "packing_unit") else "0"
+	lead_time_expr = "ip.lead_time_days" if _has_field("Item Price", "lead_time_days") else "0"
+	supplier_clause = ""
+	if supplier and _has_field("Item Price", "supplier"):
+		supplier_clause = " and (ifnull(ip.supplier, '') in ('', %(supplier)s))"
+		params["supplier"] = supplier
+	rows = frappe.db.sql(
+		f"""
+		select
+			ip.name,
+			{supplier_expr} as supplier,
+			ip.price_list_rate,
+			{packing_unit_expr} as packing_unit,
+			{lead_time_expr} as lead_time_days,
+			ip.valid_from,
+			ip.valid_upto
+		from `tabItem Price` ip
+		where ip.item_code = %(item_code)s
+			and ifnull(ip.buying, 0) = 1
+			and (ip.valid_from is null or ip.valid_from <= %(as_of_date)s)
+			and (ip.valid_upto is null or ip.valid_upto >= %(as_of_date)s)
+			{supplier_clause}
+		order by
+			{supplier_order_expr},
+			case when ifnull({lead_time_expr}, 0) > 0 then 0 else 1 end,
+			ip.price_list_rate asc,
+			ip.valid_from desc,
+			ip.creation desc
+		limit 1
+		""",
+		params,
+		as_dict=True,
+	)
+	return rows[0] if rows else None
+
+
+def _get_purchase_order_history_suggestion(item_code: str | None, supplier: str | None = None):
+	if not item_code or not _doctype_exists("Purchase Order") or not _doctype_exists("Purchase Order Item"):
+		return None
+	if not _has_field("Purchase Order", "transaction_date") or not _has_field("Purchase Order Item", "schedule_date"):
+		return None
+	params = {"item_code": item_code}
+	supplier_clause = ""
+	if supplier and _has_field("Purchase Order", "supplier"):
+		supplier_clause = " and po.supplier = %(supplier)s"
+		params["supplier"] = supplier
+	rows = frappe.db.sql(
+		f"""
+		select
+			avg(lead_time_days) as lead_time_days,
+			count(*) as sample_size
+		from (
+			select datediff(poi.schedule_date, po.transaction_date) as lead_time_days
+			from `tabPurchase Order Item` poi
+			inner join `tabPurchase Order` po on po.name = poi.parent
+			where po.docstatus = 1
+				and poi.item_code = %(item_code)s
+				and poi.schedule_date is not null
+				and po.transaction_date is not null
+				and datediff(poi.schedule_date, po.transaction_date) > 0
+				{supplier_clause}
+			order by po.transaction_date desc, poi.creation desc
+			limit 20
+		) history
+		""",
+		params,
+		as_dict=True,
+	)
+	if not rows or not flt(rows[0].get("lead_time_days")):
+		return None
+	return rows[0]
+
+
 def _set_buffer_as_default_if_possible(buffer_name: str, item_code: str, company: str | None) -> None:
 	if not buffer_name or not item_code or not company:
 		return
@@ -673,6 +1019,8 @@ def _get_stock_buffer_console_items(filters: dict[str, Any]) -> list[frappe._dic
 		"custom_mrp_lead_time_days",
 		"lead_time_days",
 		"lead_time",
+		"min_order_qty",
+		"purchase_uom",
 	):
 		if _has_field("Item", fieldname):
 			fields.append(fieldname)
@@ -688,32 +1036,46 @@ def _get_stock_buffer_console_items(filters: dict[str, Any]) -> list[frappe._dic
 def _get_console_buffer_maps(company: str | None, item_codes: list[str]):
 	if not company or not item_codes or not _doctype_exists("MRP Stock Buffer"):
 		return {}, {}
+	fields = [
+		"name",
+		"company",
+		"item_code",
+		"warehouse",
+		"dlt_days",
+		"min_order_qty",
+		"order_multiple_qty",
+		"adu",
+		"red_zone_qty",
+		"yellow_zone_qty",
+		"green_zone_qty",
+		"top_of_red",
+		"top_of_yellow",
+		"top_of_green",
+		"on_hand_qty",
+		"incoming_dlt_qty",
+		"qualified_demand_qty",
+		"net_flow_position",
+		"net_flow_position_percent",
+		"planning_priority",
+		"recommended_qty",
+		"last_calculated_on",
+		"is_default_for_item",
+	]
+	for fieldname in (
+		"suggested_dlt_days",
+		"suggested_dlt_source",
+		"suggested_dlt_confidence",
+		"suggested_min_order_qty",
+		"suggested_order_multiple_qty",
+		"suggestions_calculated_on",
+		"suggestion_notes",
+	):
+		if _has_field("MRP Stock Buffer", fieldname):
+			fields.append(fieldname)
 	rows = frappe.get_all(
 		"MRP Stock Buffer",
 		filters={"active": 1, "company": company, "item_code": ["in", item_codes]},
-		fields=[
-			"name",
-			"company",
-			"item_code",
-			"warehouse",
-			"dlt_days",
-			"adu",
-			"red_zone_qty",
-			"yellow_zone_qty",
-			"green_zone_qty",
-			"top_of_red",
-			"top_of_yellow",
-			"top_of_green",
-			"on_hand_qty",
-			"incoming_dlt_qty",
-			"qualified_demand_qty",
-			"net_flow_position",
-			"net_flow_position_percent",
-			"planning_priority",
-			"recommended_qty",
-			"last_calculated_on",
-			"is_default_for_item",
-		],
+		fields=fields,
 		limit_page_length=10000,
 	)
 	by_key: dict[tuple[str, str], list[frappe._dict]] = {}
@@ -738,9 +1100,20 @@ def _get_console_status(item, warehouse: str | None, buffers: list[Any], default
 	if default_count and not cint(buffer.get("is_default_for_item")):
 		return "Conflict"
 	if not flt(buffer.get("dlt_days")):
+		if flt(buffer.get("suggested_dlt_days")) > 0:
+			return "Review DLT"
 		return "Missing DLT"
 	if _buffer_needs_refresh(buffer):
 		return "Needs Refresh"
+	if _has_meaningful_suggestion_diff(buffer.get("dlt_days"), buffer.get("suggested_dlt_days")):
+		return "DLT Mismatch"
+	if (
+		_has_meaningful_suggestion_diff(buffer.get("min_order_qty"), buffer.get("suggested_min_order_qty"))
+		or _has_meaningful_suggestion_diff(buffer.get("order_multiple_qty"), buffer.get("suggested_order_multiple_qty"))
+	):
+		return "Procurement Mismatch"
+	if buffer.get("suggested_dlt_confidence") == SUGGESTION_LOW and flt(buffer.get("suggested_dlt_days")) > 0:
+		return "Low Confidence"
 	return "Active"
 
 
@@ -778,6 +1151,15 @@ def _make_console_row(item, company: str | None, warehouse: str | None, buffer, 
 			"net_flow_position_percent": flt(buffer.get("net_flow_position_percent")),
 			"recommended_qty": flt(buffer.get("recommended_qty")),
 			"dlt_days": flt(buffer.get("dlt_days")),
+			"min_order_qty": flt(buffer.get("min_order_qty")),
+			"order_multiple_qty": flt(buffer.get("order_multiple_qty")),
+			"suggested_dlt_days": flt(buffer.get("suggested_dlt_days")),
+			"suggested_dlt_source": buffer.get("suggested_dlt_source"),
+			"suggested_dlt_confidence": buffer.get("suggested_dlt_confidence"),
+			"suggested_min_order_qty": flt(buffer.get("suggested_min_order_qty")),
+			"suggested_order_multiple_qty": flt(buffer.get("suggested_order_multiple_qty")),
+			"suggestions_calculated_on": buffer.get("suggestions_calculated_on"),
+			"suggestion_notes": buffer.get("suggestion_notes"),
 			"adu": flt(buffer.get("adu")),
 			"red_zone_qty": flt(buffer.get("red_zone_qty")),
 			"yellow_zone_qty": flt(buffer.get("yellow_zone_qty")),
@@ -803,6 +1185,7 @@ def _stock_buffer_console_cards(rows: list[Any]) -> list[dict[str, Any]]:
 		{"label": _("Active Buffers"), "value": counts.get("Active", 0)},
 		{"label": _("Missing Buffers"), "value": counts.get("Missing Buffer", 0)},
 		{"label": _("Needs Refresh"), "value": counts.get("Needs Refresh", 0)},
+		{"label": _("Review Suggestions"), "value": counts.get("Review DLT", 0) + counts.get("DLT Mismatch", 0) + counts.get("Procurement Mismatch", 0) + counts.get("Low Confidence", 0)},
 	]
 
 

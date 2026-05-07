@@ -511,17 +511,45 @@ Missing Buffer,缺失缓冲
 Missing Warehouse,缺少仓库
 Missing DLT,缺少 DLT
 Needs Refresh,需要刷新
+Review DLT,复核 DLT
+DLT Mismatch,DLT 不一致
+Procurement Mismatch,采购约束不一致
+Low Confidence,低可信度
 Disabled,未启用
 Conflict,冲突
 Create Missing Buffers,创建缺失缓冲
 Refresh Buffers,刷新缓冲
 Apply Group Defaults,应用物料组默认值
+Apply Suggestions,应用建议值
 Loading stock buffers...,正在加载库存缓冲...
 No stock buffer rows found.,未找到库存缓冲行。
 Creating missing stock buffers...,正在创建缺失库存缓冲...
 Refreshing stock buffers...,正在刷新库存缓冲...
 Applying stock buffer defaults...,正在应用库存缓冲默认值...
+Applying stock buffer suggestions...,正在应用库存缓冲建议值...
 Done. Updated: {0},完成。已更新：{0}
+System Suggestions,系统建议
+Suggested DLT Days,建议 DLT 天数
+Suggested DLT Source,建议 DLT 来源
+Suggested DLT Confidence,建议 DLT 可信度
+Suggested Minimum Order Qty,建议最小下单数量
+Suggested Order Multiple Qty,建议订货倍量
+Suggestions Calculated On,建议计算时间
+Suggestion Notes,建议备注
+Review Suggestions,需复核建议
+High,高
+Medium,中
+Low,低
+System-calculated DLT suggestion from supply rules, supplier quotations, item prices, item lead time, or recent purchase orders. Review before applying.,系统根据供应规则、供应商报价、物料价格、物料前置时间或近期采购订单计算的 DLT 建议。应用前请复核。
+System-calculated MOQ suggestion from supply rules or Item master data. Review before applying.,系统根据供应规则或物料主数据计算的最小下单数量建议。应用前请复核。
+System-calculated order multiple suggestion from supply rules or Item Price packing unit. Review before applying.,系统根据供应规则或物料价格包装单位计算的订货倍量建议。应用前请复核。
+MRP Supply Rule {0},MRP 供应规则 {0}
+Supplier Quotation {0},供应商报价 {0}
+Item Price {0},物料价格 {0}
+Item Lead Time,物料前置时间
+Purchase Order History,采购订单历史
+PO history sample size: {0},采购订单历史样本数：{0}
+No maintained lead time source found.,未找到已维护的前置时间来源。
 Buffer Priority,缓冲优先级
 NFP %,净流量位置 %
 Buffer Recommended,缓冲建议数量
