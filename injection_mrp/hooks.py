@@ -33,6 +33,10 @@ app_include_js = [
 	"/assets/injection_mrp/js/injection_mrp_shared.js",
 ]
 
+override_whitelisted_methods = {
+	"frappe.utils.make_barcode": "injection_mrp.api.compat.make_barcode",
+}
+
 after_install = "injection_mrp.install.after_install"
 after_migrate = "injection_mrp.install.after_migrate"
 before_uninstall = "injection_mrp.uninstall.before_uninstall"

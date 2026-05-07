@@ -1,1 +1,2 @@
 injection_mrp.patches.v0_0_1.add_mrp_indexes
+injection_mrp.patches.v0_0_2.add_stock_buffer_indexes
